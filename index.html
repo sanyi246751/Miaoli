@@ -99,6 +99,25 @@
   <script type="text/babel">
     const { useState, useEffect, useRef } = React;
 
+    function getMinguoTime(d) {
+      if (!d) d = new Date();
+      var year = d.getFullYear() - 1911;
+      var month = ('0' + (d.getMonth() + 1)).slice(-2);
+      var day = ('0' + d.getDate()).slice(-2);
+      var hours = ('0' + d.getHours()).slice(-2);
+      var minutes = ('0' + d.getMinutes()).slice(-2);
+      var seconds = ('0' + d.getSeconds()).slice(-2);
+      return '民國' + year + '年' + month + '月' + day + '日 ' + hours + ':' + minutes + ':' + seconds;
+    }
+    
+    function getMinguoCompactStr(d) {
+      if (!d) d = new Date();
+      var year = d.getFullYear() - 1911;
+      var month = ('0' + (d.getMonth() + 1)).slice(-2);
+      var day = ('0' + d.getDate()).slice(-2);
+      return year + month + day;
+    }
+
     // Data Constants
     const CATEGORIES = [
       { id: 'mattress', name: '床墊', icon: '🛏️', desc: '單人床墊、雙人床墊、彈簧床' },
@@ -378,7 +397,7 @@
         }
 
         const newBooking = {
-          id: `FUR-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`,
+          id: `FUR-${getMinguoCompactStr()}-${Math.floor(1000 + Math.random() * 9000)}`,
           applicantName,
           phone,
           email,
@@ -391,8 +410,8 @@
           items: selectedItems,
           photos: photos.map((p) => p.url),
           status: '已收件',
-          statusTimeline: [{ status: '已收件', time: new Date().toLocaleString() }],
-          createdAt: new Date().toLocaleString(),
+          statusTimeline: [{ status: '已收件', time: getMinguoTime() }],
+          createdAt: getMinguoTime(),
           agreedToTerms: true
         };
 
@@ -427,7 +446,7 @@
 
       // Admin Status Update (Bulletproof GAS Sync)
       const handleAdminUpdateStatus = (id, newStatus, note = '') => {
-        const nowTime = new Date().toLocaleString();
+        const nowTime = getMinguoTime();
         setBookings((prev) =>
           prev.map((b) => {
             if (b.id === id) {
@@ -470,7 +489,7 @@
         setIsUploadingDrive(true);
 
         const bookingId = completionModalBooking.id;
-        const nowTime = new Date().toLocaleString();
+        const nowTime = getMinguoTime();
 
         // Update local state first
         setBookings((prev) =>
@@ -537,7 +556,7 @@
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `環保局廢棄傢俱清運清單_${new Date().toISOString().slice(0, 10)}.csv`;
+        a.download = `大型廢棄傢俱預約清運資料_${getMinguoCompactStr()}.csv`;
         a.click();
       };
 
@@ -1394,7 +1413,7 @@
 
                   <div className="pt-2 border-t border-slate-300 text-[10px] text-slate-500 flex justify-between">
                     <span>※ 請勿夾雜事業廢棄物或危險物品 ‧ 清潔隊客服: (02) 2720-8889</span>
-                    <span>列印日期: {new Date().toLocaleDateString()}</span>
+                    <span>列印日期: {getMinguoTime().split(' ')[0]}</span>
                   </div>
                 </div>
 
