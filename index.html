@@ -70,9 +70,19 @@
       html, body {
         overflow: visible !important;
         height: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: white !important;
       }
       body * {
-        visibility: hidden !important;
+        visibility: hidden;
+      }
+      #root, .fixed, .overflow-y-auto {
+        position: static !important;
+        overflow: visible !important;
+        max-height: none !important;
+        height: auto !important;
+        transform: none !important;
       }
       #printable-tag, #printable-tag * {
         visibility: visible !important;
@@ -238,9 +248,17 @@
       };
 
       useEffect(() => {
+        let intervalId;
         if (gasUrl) {
           fetchFromGoogleSheets();
+          // 每 60 秒自動從 Google Sheets 拉取最新資料 (Auto Pull)
+          intervalId = setInterval(() => {
+            fetchFromGoogleSheets();
+          }, 60000);
         }
+        return () => {
+          if (intervalId) clearInterval(intervalId);
+        };
       }, [gasUrl]);
 
       const handleSaveGasUrl = (url) => {
@@ -1372,7 +1390,7 @@
 
           {/* Modal 2: Printable Identification Tag */}
           {printableBooking && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md no-print">
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md">
               <div className="w-full max-w-2xl bg-slate-900 rounded-3xl border border-slate-700 p-6 space-y-4 max-h-[90vh] overflow-y-auto">
                 <div className="flex justify-between items-center border-b border-slate-800 pb-3">
                   <h3 className="text-lg font-bold">🖨️ 預約清運標籤列印預覽</h3>
