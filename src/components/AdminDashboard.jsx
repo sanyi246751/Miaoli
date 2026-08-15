@@ -9,12 +9,21 @@ export default function AdminDashboard({ bookings, setBookings, onOpenTagModal }
   const [searchKey, setSearchKey] = useState('');
   const [vehicleSelections, setVehicleSelections] = useState({});
   const [tripSelections, setTripSelections] = useState({});
+  const [vehicles, setVehicles] = useState(() => { try { const saved = JSON.parse(localStorage.getItem('recycling_vehicles') || '["A","B"]'); const valid = Array.isArray(saved) ? saved.filter((item) => typeof item === 'string' && item.trim()).map((item) => item.trim()) : []; return valid.length ? valid : ['A', 'B']; } catch { return ['A', 'B']; } });
+  const [showVehicleManager, setShowVehicleManager] = useState(false);
+  const [newVehicle, setNewVehicle] = useState('');
   const [routeEditor, setRouteEditor] = useState(null);
   const [routeCalculations, setRouteCalculations] = useState(() => { try { return JSON.parse(localStorage.getItem('recycling_route_calculations') || '{}'); } catch { return {}; } });
   const [customRoutes, setCustomRoutes] = useState(() => { try { return JSON.parse(localStorage.getItem('recycling_custom_routes') || '{}'); } catch { return {}; } });
   const getDispatchPeriod = (booking) => String(booking.preferredTimeSlot || '未指定時段').trim().split(/\s+/)[0];
   const getDispatchTrip = (booking) => Number(booking.dispatchTrip || 1);
   const getRouteKey = (booking) => `${booking.preferredDate}|${booking.assignedVehicle}|${getDispatchPeriod(booking)}|${getDispatchTrip(booking)}`;
+  const saveVehicleCache = (next) => { setVehicles(next); localStorage.setItem('recycling_vehicles', JSON.stringify(next)); };
+  const loadVehicles = async () => { const gasUrl = localStorage.getItem('gas_web_app_url'); if (!gasUrl) return; try { const response = await fetch(`${gasUrl}?action=getVehicles`); const result = await response.json(); const valid = Array.isArray(result.data) ? result.data.filter((item) => typeof item === 'string' && item.trim()).map((item) => item.trim()) : []; if (result.status === 'success' && valid.length) saveVehicleCache(valid); } catch (error) { console.error('Vehicle Fetch Error:', error); } };
+  const addVehicle = async () => { const value = newVehicle.trim(); if (!value) return; if (vehicles.some((item) => item.toLowerCase() === value.toLowerCase())) { window.alert('此車號已存在。'); return; } const gasUrl = localStorage.getItem('gas_web_app_url'); try { const response = await fetch(`${gasUrl}?action=addVehicle&vehicle=${encodeURIComponent(value)}`); const result = await response.json(); if (result.status !== 'success') throw new Error(result.message); setNewVehicle(''); await loadVehicles(); } catch (error) { window.alert(`新增車號失敗：${error.message}`); } };
+  const removeVehicle = async (vehicle) => { if (vehicles.length <= 1) { window.alert('至少需要保留一台車。'); return; } if (!window.confirm(`確定移除車號「${vehicle}」？已排班案件仍會保留原車號。`)) return; const gasUrl = localStorage.getItem('gas_web_app_url'); try { const response = await fetch(`${gasUrl}?action=deleteVehicle&vehicle=${encodeURIComponent(vehicle)}`); const result = await response.json(); if (result.status !== 'success') throw new Error(result.message); await loadVehicles(); } catch (error) { window.alert(`移除車號失敗：${error.message}`); } };
+
+  useEffect(() => { loadVehicles(); }, []);
 
   const buildRouteUrl = (orderedBookings) => {
     const stops = orderedBookings.map((item) => item.mapAddress || item.address).filter(Boolean);
@@ -156,7 +165,7 @@ export default function AdminDashboard({ bookings, setBookings, onOpenTagModal }
   const handleStatusChange = (booking, newStatus) => {
     if (newStatus === '已排班') {
       if (!(vehicleSelections[booking.id] || booking.assignedVehicle)) {
-        window.alert('請先選擇 A 車或 B 車，再將狀態改為已排班。');
+        window.alert('請先選擇車號，再將狀態改為已排班。');
         return;
       }
       handleSchedule(booking);
@@ -208,14 +217,10 @@ export default function AdminDashboard({ bookings, setBookings, onOpenTagModal }
           </h2>
         </div>
 
-        <button
-          onClick={handleExportCSV}
-          className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/30 font-bold text-xs transition-all flex items-center space-x-2 shadow-md"
-        >
-          <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
-          <span>匯出 Excel / CSV 派車清單</span>
-        </button>
+        <div className="flex gap-2"><button onClick={() => setShowVehicleManager((current) => !current)} className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-300 border border-sky-500/30 font-bold text-xs">🚚 車輛管理</button><button onClick={handleExportCSV} className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/30 font-bold text-xs transition-all flex items-center space-x-2 shadow-md"><FileSpreadsheet className="w-4 h-4 text-emerald-400" /><span>匯出 Excel / CSV 派車清單</span></button></div>
       </div>
+
+      {showVehicleManager && <div className="rounded-2xl border border-sky-500/30 bg-slate-900/80 p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h3 className="text-sm font-black text-white">車輛管理</h3><p className="mt-1 text-xs text-slate-400">新增或移除排班可選車號；已排班案件不受刪除影響。</p></div><div className="flex gap-2"><input value={newVehicle} onChange={(e) => setNewVehicle(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') addVehicle(); }} placeholder="輸入車號" className="w-36 rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-xs font-bold text-white"/><button onClick={addVehicle} className="rounded-lg bg-sky-400 px-3 py-2 text-xs font-black text-slate-950">新增車號</button></div></div><div className="mt-3 flex flex-wrap gap-2">{vehicles.map((vehicle) => <span key={vehicle} className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-xs font-black text-slate-100">🚛 {vehicle}<button onClick={() => removeVehicle(vehicle)} className="text-rose-400 hover:text-rose-300" aria-label={`移除車號 ${vehicle}`}>✕</button></span>)}</div></div>}
 
       {/* Metric Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -399,8 +404,8 @@ export default function AdminDashboard({ bookings, setBookings, onOpenTagModal }
                           <div className="flex items-center gap-1.5">
                             <select value={vehicleSelections[b.id] || b.assignedVehicle || ''} onChange={(e) => setVehicleSelections((prev) => ({ ...prev, [b.id]: e.target.value }))} className="rounded-lg border border-slate-600 bg-slate-800 px-2 py-1 text-xs font-bold text-slate-200" aria-label={`選擇 ${b.id} 的資源回收車`}>
                               <option value="">先選車輛</option>
-                              <option value="A">A 車</option>
-                              <option value="B">B 車</option>
+                              {!vehicles.includes(b.assignedVehicle) && b.assignedVehicle && <option value={b.assignedVehicle}>{b.assignedVehicle}（已停用）</option>}
+                              {vehicles.map((vehicle) => <option key={vehicle} value={vehicle}>{vehicle} 車</option>)}
                             </select>
                             <select value={tripSelections[b.id] || b.dispatchTrip || 1} onChange={(e) => setTripSelections((prev) => ({ ...prev, [b.id]: Number(e.target.value) }))} className="rounded-lg border border-slate-600 bg-slate-800 px-2 py-1 text-xs font-bold text-slate-200" aria-label={`選擇 ${b.id} 的發車趟次`}>
                               {[1, 2, 3, 4].map((trip) => <option key={trip} value={trip}>第 {trip} 趟</option>)}
