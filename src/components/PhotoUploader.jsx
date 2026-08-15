@@ -1,12 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { UploadCloud, X, Image as ImageIcon, CheckCircle, Info, Sparkles, Trash2 } from 'lucide-react';
-
-// Sample demo images for user testing convenience
-const DEMO_IMAGES = [
-  { name: '待清運雙人床墊實體照片.jpg', url: 'https://images.unsplash.com/photo-1616046229478-9901c5536a45?w=500&auto=format&fit=crop&q=60' },
-  { name: '舊木質沙發現場圖.jpg', url: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=500&auto=format&fit=crop&q=60' },
-  { name: '舊型電視與電視櫃.jpg', url: 'https://images.unsplash.com/photo-1593078165899-7f467690a168?w=500&auto=format&fit=crop&q=60' }
-];
+import { UploadCloud, X } from 'lucide-react';
 
 export default function PhotoUploader({ photos, setPhotos }) {
   const fileInputRef = useRef(null);
@@ -57,18 +50,6 @@ export default function PhotoUploader({ photos, setPhotos }) {
     setPhotos((prev) => prev.filter((p) => p.id !== id));
   };
 
-  const handleAddDemoPhoto = (demo) => {
-    setPhotos((prev) => [
-      ...prev,
-      {
-        id: Date.now() + Math.random().toString(),
-        name: demo.name,
-        size: '1.4 MB',
-        url: demo.url
-      }
-    ]);
-  };
-
   return (
     <div className="space-y-6">
       <div>
@@ -88,72 +69,8 @@ export default function PhotoUploader({ photos, setPhotos }) {
         </p>
       </div>
 
-      {/* Drag & Drop Upload Zone */}
-      <div
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        onClick={() => fileInputRef.current?.click()}
-        className={`relative border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all duration-200 ${
-          isDragging
-            ? 'border-emerald-400 bg-emerald-500/10 scale-[1.01]'
-            : 'border-slate-700/80 hover:border-emerald-500/50 bg-slate-800/30 hover:bg-slate-800/60'
-        }`}
-      >
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={handleFileChange}
-          accept="image/*"
-          multiple
-          className="hidden"
-        />
-
-        <div className="flex flex-col items-center justify-center space-y-3">
-          <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform">
-            <UploadCloud className="w-8 h-8 stroke-[1.8]" />
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-slate-200">
-              點擊此處上傳照片 或 將照片檔案拖曳至此
-            </p>
-            <p className="text-xs text-slate-400 mt-1">
-              支援 JPG, PNG, WEBP 格式（建議上傳 1 ~ 5 張照片）
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Demo Photos Quick Add (For Quick Testing) */}
-      <div className="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/60">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-xs font-bold text-slate-300 flex items-center">
-            <Sparkles className="w-3.5 h-3.5 mr-1.5 text-amber-400" />
-            快速測試體驗：點擊直接載入預設範例照片
-          </span>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {DEMO_IMAGES.map((demo, idx) => (
-            <button
-              key={idx}
-              type="button"
-              onClick={() => handleAddDemoPhoto(demo)}
-              className="text-xs px-3 py-1.5 rounded-lg bg-slate-700/60 hover:bg-emerald-500/20 hover:text-emerald-300 text-slate-300 border border-slate-600/60 transition-all flex items-center space-x-1.5"
-            >
-              <ImageIcon className="w-3 h-3 text-emerald-400" />
-              <span>+ {demo.name.split('.')[0]}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Photo Preview Grid */}
-      {photos.length > 0 && (
-        <div>
-          <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
-            已新增的照片清單 ({photos.length})
-          </h4>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+      <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" multiple className="hidden" />
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
             {photos.map((photo) => (
               <div
                 key={photo.id}
@@ -178,9 +95,12 @@ export default function PhotoUploader({ photos, setPhotos }) {
                 </div>
               </div>
             ))}
-          </div>
-        </div>
-      )}
+        <button type="button" onClick={() => fileInputRef.current?.click()} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop} className={`h-32 rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-1.5 transition-all ${isDragging ? 'border-emerald-400 bg-emerald-500/15' : 'border-emerald-500/50 bg-slate-800/40 hover:bg-emerald-500/10'}`}>
+          <UploadCloud className="w-6 h-6 text-emerald-400" />
+          <span className="text-xs font-bold text-slate-200">上傳照片</span>
+          <span className="text-[10px] text-slate-400">可選多張</span>
+        </button>
+      </div>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { CITY_DISTRICTS } from '../data/mockData';
 import ItemSelector from './ItemSelector';
 import PhotoUploader from './PhotoUploader';
@@ -10,20 +10,19 @@ export default function BookingForm({ onSubmitSuccess }) {
   const [applicantName, setApplicantName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
-  const [district, setDistrict] = useState('大安區');
+  const [county, setCounty] = useState('苗栗縣');
+  const [district, setDistrict] = useState('苗栗市');
   const [detailAddress, setDetailAddress] = useState('');
 
   // Selected items & photos
-  const [selectedItems, setSelectedItems] = useState([
-    { categoryId: 'mattress', categoryName: '床墊', name: '雙人彈簧床墊', quantity: 1, note: '' }
-  ]);
+  const [selectedItems, setSelectedItems] = useState([]);
   const [photos, setPhotos] = useState([]);
 
   // Time & Location
   // Default to 3 days in the future
   const defaultDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
   const [preferredDate, setPreferredDate] = useState(defaultDate);
-  const [preferredTimeSlot, setPreferredTimeSlot] = useState('上午 (08:00 - 12:00)');
+  const [preferredTimeSlot, setPreferredTimeSlot] = useState('上午8點至12點');
   const [locationNote, setLocationNote] = useState('');
 
   // Legal Consent
@@ -32,12 +31,20 @@ export default function BookingForm({ onSubmitSuccess }) {
   // Form errors state
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitSecondsLeft, setSubmitSecondsLeft] = useState(0);
+
+  useEffect(() => {
+    if (!isSubmitting || submitSecondsLeft <= 0) return;
+    const timer = setTimeout(() => setSubmitSecondsLeft((seconds) => Math.max(0, seconds - 1)), 1000);
+    return () => clearTimeout(timer);
+  }, [isSubmitting, submitSecondsLeft]);
 
   // Quick fill sample data for fast evaluation
   const handleQuickFill = () => {
     setApplicantName('王小明');
     setPhone('0912-345-678');
     setEmail('xiaoming.wang@example.com');
+    setCounty('台北市');
     setDistrict('大安區');
     setDetailAddress('台北市大安區新生南路三段 100 號一樓大門口旁');
     setLocationNote('請放置於一樓側門走廊，不佔用紅線');
@@ -92,6 +99,7 @@ export default function BookingForm({ onSubmitSuccess }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (isSubmitting) return;
     if (!validateForm()) {
       // Scroll to top or first error
       window.scrollTo({ top: 100, behavior: 'smooth' });
@@ -99,14 +107,23 @@ export default function BookingForm({ onSubmitSuccess }) {
     }
 
     setIsSubmitting(true);
+    const estimatedSeconds = photos.length > 0 ? Math.min(10, 2 + photos.length * 2) : 1;
+    setSubmitSecondsLeft(estimatedSeconds);
 
     // Simulate API network call delay
     setTimeout(() => {
+      const bookingDate = new Date();
+      const bookingPrefix = `${bookingDate.getFullYear() - 1911}-${String(bookingDate.getMonth() + 1).padStart(2, '0')}${String(bookingDate.getDate()).padStart(2, '0')}-`;
+      let cachedBookings = [];
+      try { cachedBookings = JSON.parse(localStorage.getItem('bulky_furniture_bookings') || '[]'); } catch { cachedBookings = []; }
+      const dailySequences = cachedBookings.filter((booking) => String(booking.id || '').startsWith(bookingPrefix)).map((booking) => Number(String(booking.id).slice(bookingPrefix.length))).filter(Number.isFinite);
+      const bookingId = bookingPrefix + String(Math.max(0, ...dailySequences) + 1).padStart(3, '0');
       const newBooking = {
-        id: `FUR-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${Math.floor(1000 + Math.random() * 9000)}`,
+        id: bookingId,
         applicantName,
         phone,
         email,
+        county,
         district,
         address: detailAddress,
         preferredDate,
@@ -122,28 +139,33 @@ export default function BookingForm({ onSubmitSuccess }) {
         agreedToTerms: true
       };
 
-      setIsSubmitting(false);
       onSubmitSuccess(newBooking);
-    }, 800);
+      setApplicantName(''); setPhone(''); setEmail(''); setCounty('苗栗縣'); setDistrict('苗栗市');
+      setDetailAddress(''); setSelectedItems([]); setPhotos([]); setPreferredDate(defaultDate);
+      setPreferredTimeSlot('上午8點至12點'); setLocationNote(''); setAgreedTerms([]); setErrors({});
+      setSubmitSecondsLeft(0);
+      setIsSubmitting(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, photos.length > 0 ? Math.min(2500, estimatedSeconds * 500) : 500);
   };
 
   return (
     <form onSubmit={handleSubmit} className="max-w-4xl mx-auto space-y-8">
       
       {/* Banner / Header Card */}
-      <div className="relative rounded-3xl p-6 sm:p-8 bg-gradient-to-r from-slate-900 via-slate-850 to-emerald-950 border border-emerald-500/30 shadow-2xl overflow-hidden">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
+      <div className="booking-hero relative rounded-[2rem] p-6 sm:p-9 border border-emerald-200 shadow-xl overflow-hidden">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-300/25 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
         
         <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
-            <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 mb-3">
-              <Sparkles className="w-3.5 h-3.5 mr-1 text-emerald-400" />
+            <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-white/80 text-emerald-800 border border-emerald-200 mb-3 shadow-sm">
+              <Sparkles className="w-3.5 h-3.5 mr-1 text-emerald-600" />
               台北/新北家戶免費申請 Portal
             </div>
-            <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+            <h2 className="text-2xl sm:text-4xl font-black text-emerald-950 tracking-tight">
               線上預約大型廢棄傢俱清運
             </h2>
-            <p className="text-sm text-slate-300 mt-2 max-w-xl">
+            <p className="text-sm text-slate-600 mt-3 max-w-xl leading-relaxed">
               填寫下方基本資料、選擇待清運品項並上傳照片，完成後即可獲取專屬「清運標籤單號」與 QR Code。
             </p>
           </div>
@@ -151,7 +173,7 @@ export default function BookingForm({ onSubmitSuccess }) {
           <button
             type="button"
             onClick={handleQuickFill}
-            className="flex-shrink-0 px-4 py-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 text-xs font-bold border border-emerald-500/30 transition-all flex items-center space-x-1.5 shadow-lg"
+            className="flex-shrink-0 px-4 py-2.5 rounded-xl bg-white hover:bg-emerald-50 text-emerald-800 text-xs font-bold border border-emerald-200 transition-all flex items-center space-x-1.5 shadow-lg"
           >
             <Sparkles className="w-4 h-4 text-amber-400" />
             <span>自動帶入測試範例資料</span>
@@ -192,7 +214,7 @@ export default function BookingForm({ onSubmitSuccess }) {
           {/* Applicant Name */}
           <div>
             <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center">
-              <User className="w-3.5 h-3.5 mr-1 text-emerald-400" />
+              <User className="w-3.5 h-3.5 mr-1 text-emerald-600" />
               申請人姓名 <span className="text-rose-400 ml-1">*</span>
             </label>
             <input
@@ -214,7 +236,7 @@ export default function BookingForm({ onSubmitSuccess }) {
           {/* Applicant Phone */}
           <div>
             <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center">
-              <Phone className="w-3.5 h-3.5 mr-1 text-emerald-400" />
+              <Phone className="w-3.5 h-3.5 mr-1 text-emerald-600" />
               行動電話 / 聯絡電話 <span className="text-rose-400 ml-1">*</span>
             </label>
             <input
@@ -237,7 +259,7 @@ export default function BookingForm({ onSubmitSuccess }) {
           <div className="sm:col-span-2">
             <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center justify-between">
               <span className="flex items-center">
-                <Mail className="w-3.5 h-3.5 mr-1 text-emerald-400" />
+                <Mail className="w-3.5 h-3.5 mr-1 text-emerald-600" />
                 電子郵件 (Email)
               </span>
               <span className="text-[11px] text-slate-400 font-normal">選填，填寫將發送預約憑證副本</span>
@@ -254,8 +276,14 @@ export default function BookingForm({ onSubmitSuccess }) {
           {/* City / District & Detail Address */}
           <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
+              <label className="block text-xs font-bold text-slate-300 mb-1.5">縣市 <span className="text-rose-400">*</span></label>
+              <select value={county} onChange={(e) => { const next = e.target.value; setCounty(next); setDistrict(CITY_DISTRICTS[next][0]); }} className="w-full bg-slate-900/90 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-emerald-500">
+                {Object.keys(CITY_DISTRICTS).map((city) => <option key={city} value={city}>{city}</option>)}
+              </select>
+            </div>
+            <div>
               <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center">
-                <MapPin className="w-3.5 h-3.5 mr-1 text-emerald-400" />
+                <MapPin className="w-3.5 h-3.5 mr-1 text-emerald-600" />
                 行政區域 <span className="text-rose-400 ml-1">*</span>
               </label>
               <select
@@ -263,7 +291,7 @@ export default function BookingForm({ onSubmitSuccess }) {
                 onChange={(e) => setDistrict(e.target.value)}
                 className="w-full bg-slate-900/90 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-emerald-500"
               >
-                {CITY_DISTRICTS.map((d) => (
+                {CITY_DISTRICTS[county].map((d) => (
                   <option key={d} value={d}>
                     {d}
                   </option>
@@ -271,7 +299,7 @@ export default function BookingForm({ onSubmitSuccess }) {
               </select>
             </div>
 
-            <div className="sm:col-span-2">
+            <div>
               <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center">
                 詳細清運地址（含街道、門牌、一樓放置處） <span className="text-rose-400 ml-1">*</span>
               </label>
@@ -325,7 +353,7 @@ export default function BookingForm({ onSubmitSuccess }) {
           {/* Preferred Date */}
           <div>
             <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center">
-              <Calendar className="w-3.5 h-3.5 mr-1 text-emerald-400" />
+              <Calendar className="w-3.5 h-3.5 mr-1 text-emerald-600" />
               約定清運日期 <span className="text-rose-400 ml-1">*</span>
             </label>
             <input
@@ -335,12 +363,14 @@ export default function BookingForm({ onSubmitSuccess }) {
               onChange={(e) => setPreferredDate(e.target.value)}
               className="w-full bg-slate-900/90 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-emerald-500"
             />
+            <p className="mt-1 text-[11px] text-slate-400">民國日期：{preferredDate ? `${Number(preferredDate.slice(0, 4)) - 1911}/${Number(preferredDate.slice(5, 7))}/${Number(preferredDate.slice(8, 10))}` : '—'}</p>
+            {errors.preferredDate && <p className="mt-1 text-xs text-rose-400">{errors.preferredDate}</p>}
           </div>
 
           {/* Time Slot */}
           <div>
             <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center">
-              <Clock className="w-3.5 h-3.5 mr-1 text-emerald-400" />
+              <Clock className="w-3.5 h-3.5 mr-1 text-emerald-600" />
               希望清運時段 <span className="text-rose-400 ml-1">*</span>
             </label>
             <select
@@ -348,8 +378,8 @@ export default function BookingForm({ onSubmitSuccess }) {
               onChange={(e) => setPreferredTimeSlot(e.target.value)}
               className="w-full bg-slate-900/90 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-emerald-500"
             >
-              <option value="上午 (08:00 - 12:00)">上午時段 (08:00 - 12:00)</option>
-              <option value="下午 (13:00 - 17:00)">下午時段 (13:00 - 17:00)</option>
+              <option value="上午8點至12點">上午8點至12點</option>
+              <option value="下午1點至5點">下午1點至5點</option>
             </select>
           </div>
 
@@ -385,7 +415,7 @@ export default function BookingForm({ onSubmitSuccess }) {
           className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-black text-base shadow-xl shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all flex items-center justify-center space-x-2 disabled:opacity-50"
         >
           {isSubmitting ? (
-            <span>系統處理與建立預約單中...</span>
+            <span>送出處理中{photos.length > 0 && submitSecondsLeft > 0 ? `，預估還有 ${submitSecondsLeft} 秒` : '…'}</span>
           ) : (
             <>
               <CheckCircle2 className="w-5 h-5 stroke-[2.5]" />

@@ -6,7 +6,7 @@ import BookingSuccessModal from './components/BookingSuccessModal';
 import PrintableTagModal from './components/PrintableTagModal';
 import BookingQuery from './components/BookingQuery';
 import AdminDashboard from './components/AdminDashboard';
-import { Truck, ShieldCheck, Heart, PhoneCall, HelpCircle, Leaf } from 'lucide-react';
+import { Truck, PhoneCall, HelpCircle } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('booking');
@@ -62,7 +62,7 @@ export default function App() {
   const pendingCount = bookings.filter((b) => b.status === '已收件' || b.status === '待審核').length;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-slate-950">
+    <div className="app-shell min-h-screen text-slate-800 flex flex-col font-sans selection:bg-emerald-200 selection:text-emerald-950">
       
       {/* Header */}
       <Header
@@ -72,7 +72,7 @@ export default function App() {
       />
 
       {/* Main View Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="relative z-10 flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-7 sm:py-12">
         
         {/* Tab 1: Booking Form */}
         {activeTab === 'booking' && (
@@ -126,32 +126,32 @@ export default function App() {
       )}
 
       {/* Footer */}
-      <footer className="mt-16 bg-slate-900 border-t border-slate-800 text-slate-400 py-10 no-print">
+      <footer className="mt-16 border-t border-emerald-900/10 bg-emerald-950 py-9 text-emerald-100/70 no-print">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4 border-b border-slate-800 pb-6">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5 border-b border-white/10 pb-6">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
+              <div className="w-11 h-11 rounded-2xl bg-emerald-300 text-emerald-950 flex items-center justify-center shadow-lg shadow-black/10">
                 <Truck className="w-5 h-5" />
               </div>
               <div>
-                <h4 className="font-bold text-slate-200 text-base">大型廢棄傢俱預約清運管理系統</h4>
-                <p className="text-xs text-slate-400">環保局家戶廢棄物專案服務 ‧ 依據廢棄物清理法及個資法保護規定辦理</p>
+                <h4 className="font-bold text-white text-base">大型廢棄傢俱預約清運管理系統</h4>
+                <p className="text-xs text-emerald-100/60">環保局家戶廢棄物專案服務 ‧ 依據廢棄物清理法及個資法保護規定辦理</p>
               </div>
             </div>
 
-            <div className="flex items-center space-x-6 text-xs text-slate-300">
+            <div className="flex flex-col gap-2 text-xs text-emerald-50/80 sm:flex-row sm:items-center sm:gap-6">
               <span className="flex items-center">
-                <PhoneCall className="w-4 h-4 mr-1.5 text-emerald-400" />
+                <PhoneCall className="w-4 h-4 mr-1.5 text-emerald-300" />
                 市民服務專線: 1999
               </span>
               <span className="flex items-center">
-                <HelpCircle className="w-4 h-4 mr-1.5 text-emerald-400" />
+                <HelpCircle className="w-4 h-4 mr-1.5 text-emerald-300" />
                 清潔隊客服: (02) 2720-8889
               </span>
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
+          <div className="flex flex-col sm:flex-row items-center justify-between text-xs text-emerald-100/45 gap-2">
             <p>© 2026 環保局家戶大型廢棄物清運專區. All rights reserved.</p>
             <div className="flex items-center space-x-4">
               <span>個人資料保護聲明</span>

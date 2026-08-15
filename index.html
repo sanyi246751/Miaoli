@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-TW" class="dark">
+<html lang="zh-TW">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -47,61 +47,140 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
   <style>
+    html { color-scheme: light; }
     body {
-      background-color: #090d16;
-      color: #f1f5f9;
+      margin: 0;
+      background: #f7faf8;
+      color: #173b32;
       font-family: 'Noto Sans TC', sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+      outline: 2px solid #059669;
+      outline-offset: 2px;
     }
     
     .glass-panel {
-      background: rgba(15, 23, 42, 0.8);
+      background: rgba(255, 255, 255, 0.9);
       backdrop-filter: blur(16px);
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(15, 118, 88, 0.13);
     }
 
     .glass-card {
-      background: rgba(30, 41, 59, 0.7);
+      background: rgba(255, 255, 255, 0.95);
       backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(15, 118, 88, 0.12);
+      box-shadow: 0 18px 50px -34px rgba(6,78,59,.28);
     }
 
+    /* Warm light civic-service theme */
+    .civic-shell {
+      color: #173b32;
+      background:
+        radial-gradient(circle at 8% 0%, rgba(167,243,208,.48), transparent 30rem),
+        radial-gradient(circle at 92% 18%, rgba(253,230,138,.25), transparent 26rem),
+        linear-gradient(180deg, #f9fcf9 0%, #f4f8f5 62%, #f8faf9 100%);
+      isolation: isolate;
+      position: relative;
+    }
+    .civic-shell::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      opacity: .3;
+      background-image: radial-gradient(rgba(6,95,70,.16) .7px, transparent .7px);
+      background-size: 22px 22px;
+      mask-image: linear-gradient(to bottom, #000, transparent 70%);
+    }
+    .booking-hero {
+      background: linear-gradient(135deg, #ecfdf5 0%, #f0fdfa 52%, #fff7ed 100%) !important;
+    }
+    .civic-shell input:not([type="checkbox"]):not([type="radio"]),
+    .civic-shell select,
+    .civic-shell textarea {
+      background: rgba(255,255,255,.96) !important;
+      border-color: #cbdcd4 !important;
+      color: #173b32 !important;
+      box-shadow: inset 0 1px 2px rgba(15,23,42,.025);
+    }
+    .civic-shell input::placeholder,
+    .civic-shell textarea::placeholder { color: #8a9e97 !important; }
+    .civic-shell input:focus,
+    .civic-shell select:focus,
+    .civic-shell textarea:focus { border-color: #059669 !important; }
+    .civic-shell :where(.text-white,.text-slate-100) { color: #12372d !important; }
+    .civic-shell :where(.text-slate-200) { color: #284b42 !important; }
+    .civic-shell :where(.text-slate-300) { color: #49675f !important; }
+    .civic-shell :where(.text-slate-400) { color: #647b74 !important; }
+    .civic-shell :where(.text-slate-500) { color: #789089 !important; }
+    .civic-shell :where(.border-slate-700,.border-slate-800) { border-color: #d5e2dc !important; }
+    .civic-shell :where(.divide-slate-700,.divide-slate-800) > :not([hidden]) ~ :not([hidden]) { border-color: #e3ebe7 !important; }
+    .civic-shell :where(.bg-slate-900,.bg-slate-800,.bg-slate-700) { background-color: #eef5f1 !important; }
+    .civic-shell table { background: rgba(255,255,255,.76); }
+    .civic-shell thead { color: #45645b !important; }
+    .civic-shell tbody tr:hover { background-color: #eff8f3 !important; }
+    .civic-shell header .text-white,
+    .civic-shell footer .text-white { color: #fff !important; }
+    .civic-shell > .fixed.inset-0 { background-color: rgba(6,24,19,.7) !important; }
+    .civic-shell > .fixed.inset-0 > div { background-color: #fff !important; }
+    .civic-shell footer,
+    .civic-shell footer .text-slate-400,
+    .civic-shell footer .text-slate-500 { color: rgba(236,253,245,.68) !important; }
+    .civic-shell .success-summary,
+    .civic-shell .success-summary * { color: #ffffff !important; }
     /* Print media styling for furniture booking identification tag */
     @media print {
-      html, body {
-        overflow: visible !important;
-        height: auto !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        background: white !important;
-      }
-      body * {
-        visibility: hidden;
-      }
-      #root, .fixed, .overflow-y-auto {
-        position: static !important;
-        overflow: visible !important;
-        max-height: none !important;
-        height: auto !important;
-        transform: none !important;
-      }
-      #printable-tag, #printable-tag * {
-        visibility: visible !important;
-      }
-      #printable-tag {
-        position: absolute !important;
-        left: 0 !important;
-        top: 0 !important;
-        width: 100% !important;
-        height: auto !important;
-        margin: 0 !important;
-        padding: 24px !important;
-        background: #ffffff !important;
-        color: #000000 !important;
-        box-shadow: none !important;
-        border: 4px dashed #000000 !important;
-      }
+      @page { size: A4 portrait; margin: 12mm; }
+      /* 隱藏不想印出來的區塊 (Header, Main, Footer) */
       .no-print {
         display: none !important;
+      }
+      
+      /* 將網頁底色改為白色，取消高度限制 */
+      html, body {
+        background: white !important;
+        color: black !important;
+        height: auto !important;
+        overflow: visible !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
+      /* 強制將 Modal 彈出視窗的固定定位解除，變成一般的網頁區塊 */
+      .fixed.inset-0 {
+        position: relative !important;
+        display: block !important;
+        background: white !important;
+        padding: 0 !important;
+      }
+
+      /* 強制解除 Modal 內容區塊的高度限制、捲動軸與黑色背景 */
+      .fixed.inset-0 > div {
+        background: white !important;
+        border: none !important;
+        max-height: none !important;
+        overflow: visible !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+      }
+
+      /* 隱藏 Modal 的標題列(打叉按鈕)與下方的列印按鈕區塊 */
+      .fixed.inset-0 > div > div:first-child,
+      .fixed.inset-0 > div > div:last-child {
+        display: none !important;
+      }
+      
+      /* 確保標籤本身的邊框與顏色正確 */
+      #printable-tag {
+        border: 4px dashed #000000 !important;
+        color: #000000 !important;
+        width: 180mm !important;
+        max-width: 100% !important;
+        margin: 0 auto !important;
+        text-align: center !important;
       }
     }
   </style>
@@ -115,20 +194,35 @@
 
     function getMinguoTime(d) {
       if (!d) d = new Date();
+      if (!(d instanceof Date)) {
+        var raw = String(d).trim();
+        var parts = raw.match(/\d+/g);
+        if (raw.indexOf('民國') === 0 && parts && parts.length >= 3) {
+          d = new Date(Number(parts[0]) + 1911, Number(parts[1]) - 1, Number(parts[2]), Number(parts[3] || 0), Number(parts[4] || 0));
+        } else {
+          d = new Date(raw);
+        }
+        if (isNaN(d.getTime())) return raw;
+      }
       var year = d.getFullYear() - 1911;
-      var month = ('0' + (d.getMonth() + 1)).slice(-2);
-      var day = ('0' + d.getDate()).slice(-2);
-      var hours = ('0' + d.getHours()).slice(-2);
+      var month = d.getMonth() + 1;
+      var day = d.getDate();
+      var period = d.getHours() < 12 ? '上午' : '下午';
+      var hours = ('0' + (d.getHours() % 12 || 12)).slice(-2);
       var minutes = ('0' + d.getMinutes()).slice(-2);
-      var seconds = ('0' + d.getSeconds()).slice(-2);
-      return '民國' + year + '年' + month + '月' + day + '日 ' + hours + ':' + minutes + ':' + seconds;
+      return year + '/' + month + '/' + day + period + hours + ':' + minutes;
+    }
+
+    function formatMinguoDate(value) {
+      if (/^\d{2,3}\/\d{1,2}\/\d{1,2}$/.test(String(value || ''))) return value;
+      return getMinguoTime(value).replace(/(上午|下午).*/, '');
     }
     
     function getMinguoCompactStr(d) {
       if (!d) d = new Date();
       var year = d.getFullYear() - 1911;
-      var month = ('0' + (d.getMonth() + 1)).slice(-2);
-      var day = ('0' + d.getDate()).slice(-2);
+      var month = d.getMonth() + 1;
+      var day = d.getDate();
       return year + month + day;
     }
 
@@ -154,6 +248,21 @@
       '松山區', '萬華區', '文山區', '南港區', '中正區', '大同區',
       '板橋區', '新莊區', '中和區', '三重區', '新店區', '土城區', '三義鄉', '苑裡鎮', '通霄鎮'
     ];
+    const DISTRICTS_BY_COUNTY = {
+      '基隆市':['仁愛區','信義區','中正區','中山區','安樂區','暖暖區','七堵區'], '台北市':['中正區','大同區','中山區','松山區','大安區','萬華區','信義區','士林區','北投區','內湖區','南港區','文山區'],
+      '新北市':['板橋區','三重區','中和區','永和區','新莊區','新店區','樹林區','鶯歌區','三峽區','淡水區','汐止區','瑞芳區','土城區','蘆洲區','五股區','泰山區','林口區','深坑區','石碇區','坪林區','三芝區','石門區','八里區','平溪區','雙溪區','貢寮區','金山區','萬里區','烏來區'],
+      '桃園市':['桃園區','中壢區','平鎮區','八德區','楊梅區','蘆竹區','大溪區','龍潭區','龜山區','大園區','觀音區','新屋區','復興區'], '新竹市':['東區','北區','香山區'], '新竹縣':['竹北市','竹東鎮','新埔鎮','關西鎮','湖口鄉','新豐鄉','芎林鄉','橫山鄉','北埔鄉','寶山鄉','峨眉鄉','尖石鄉','五峰鄉'],
+      '苗栗縣':['苗栗市','頭份市','竹南鎮','後龍鎮','通霄鎮','苑裡鎮','卓蘭鎮','造橋鄉','西湖鄉','頭屋鄉','公館鄉','銅鑼鄉','三義鄉','大湖鄉','獅潭鄉','三灣鄉','南庄鄉','泰安鄉'],
+      '台中市':['中區','東區','南區','西區','北區','西屯區','南屯區','北屯區','豐原區','東勢區','大甲區','清水區','沙鹿區','梧棲區','后里區','神岡區','潭子區','大雅區','新社區','石岡區','外埔區','大安區','烏日區','大肚區','龍井區','霧峰區','太平區','大里區','和平區'],
+      '彰化縣':['彰化市','員林市','鹿港鎮','和美鎮','北斗鎮','溪湖鎮','田中鎮','二林鎮','線西鄉','伸港鄉','福興鄉','秀水鄉','花壇鄉','芬園鄉','大村鄉','埔鹽鄉','埔心鄉','永靖鄉','社頭鄉','二水鄉','田尾鄉','埤頭鄉','芳苑鄉','大城鄉','竹塘鄉','溪州鄉'],
+      '南投縣':['南投市','埔里鎮','草屯鎮','竹山鎮','集集鎮','名間鄉','鹿谷鄉','中寮鄉','魚池鄉','國姓鄉','水里鄉','信義鄉','仁愛鄉'], '雲林縣':['斗六市','斗南鎮','虎尾鎮','西螺鎮','土庫鎮','北港鎮','古坑鄉','大埤鄉','莿桐鄉','林內鄉','二崙鄉','崙背鄉','麥寮鄉','東勢鄉','褒忠鄉','台西鄉','元長鄉','四湖鄉','口湖鄉','水林鄉'],
+      '嘉義市':['東區','西區'], '嘉義縣':['太保市','朴子市','布袋鎮','大林鎮','民雄鄉','溪口鄉','新港鄉','六腳鄉','東石鄉','義竹鄉','鹿草鄉','水上鄉','中埔鄉','竹崎鄉','梅山鄉','番路鄉','大埔鄉','阿里山鄉'],
+      '台南市':['中西區','東區','南區','北區','安平區','安南區','永康區','歸仁區','新化區','左鎮區','玉井區','楠西區','南化區','仁德區','關廟區','龍崎區','官田區','麻豆區','佳里區','西港區','七股區','將軍區','學甲區','北門區','新營區','後壁區','白河區','東山區','六甲區','下營區','柳營區','鹽水區','善化區','大內區','山上區','新市區','安定區'],
+      '高雄市':['楠梓區','左營區','鼓山區','三民區','鹽埕區','前金區','新興區','苓雅區','前鎮區','旗津區','小港區','鳳山區','林園區','大寮區','大樹區','大社區','仁武區','鳥松區','岡山區','橋頭區','燕巢區','田寮區','阿蓮區','路竹區','湖內區','茄萣區','永安區','彌陀區','梓官區','旗山區','美濃區','六龜區','甲仙區','杉林區','內門區','茂林區','桃源區','那瑪夏區'],
+      '屏東縣':['屏東市','潮州鎮','東港鎮','恆春鎮','萬丹鄉','長治鄉','麟洛鄉','九如鄉','里港鄉','鹽埔鄉','高樹鄉','萬巒鄉','內埔鄉','竹田鄉','新埤鄉','枋寮鄉','新園鄉','崁頂鄉','林邊鄉','南州鄉','佳冬鄉','琉球鄉','車城鄉','滿州鄉','枋山鄉','三地門鄉','霧台鄉','瑪家鄉','泰武鄉','來義鄉','春日鄉','獅子鄉','牡丹鄉'],
+      '宜蘭縣':['宜蘭市','羅東鎮','蘇澳鎮','頭城鎮','礁溪鄉','壯圍鄉','員山鄉','冬山鄉','五結鄉','三星鄉','大同鄉','南澳鄉'], '花蓮縣':['花蓮市','鳳林鎮','玉里鎮','新城鄉','吉安鄉','壽豐鄉','光復鄉','豐濱鄉','瑞穗鄉','富里鄉','秀林鄉','萬榮鄉','卓溪鄉'],
+      '台東縣':['台東市','成功鎮','關山鎮','卑南鄉','鹿野鄉','池上鄉','東河鄉','長濱鄉','太麻里鄉','大武鄉','綠島鄉','海端鄉','延平鄉','金峰鄉','達仁鄉','蘭嶼鄉'], '澎湖縣':['馬公市','湖西鄉','白沙鄉','西嶼鄉','望安鄉','七美鄉'], '金門縣':['金城鎮','金沙鎮','金湖鎮','金寧鄉','烈嶼鄉','烏坵鄉'], '連江縣':['南竿鄉','北竿鄉','莒光鄉','東引鄉']
+    };
 
     const TERMS_LIST = [
       {
@@ -226,7 +335,8 @@
 
       // Sync to localStorage as local cache
       useEffect(() => {
-        localStorage.setItem('bulky_furniture_bookings', JSON.stringify(bookings));
+        const lightweightBookings = bookings.map((b) => ({ ...b, photos: (b.photos || []).filter((url) => !String(url).startsWith('data:')) }));
+        localStorage.setItem('bulky_furniture_bookings', JSON.stringify(lightweightBookings));
       }, [bookings]);
 
       // Fetch from Google Sheets if GAS URL is configured
@@ -277,7 +387,8 @@
       const [completionModalBooking, setCompletionModalBooking] = useState(null); // Sanitation Photo Completion Modal
 
       // Admin Auth State
-      const [isAdminAuth, setIsAdminAuth] = useState(false);
+      const ADMIN_SESSION_MS = 30 * 60 * 1000;
+      const [isAdminAuth, setIsAdminAuth] = useState(() => Number(localStorage.getItem('admin_auth_until') || 0) > Date.now());
       const [adminPasswordInput, setAdminPasswordInput] = useState('');
       const [isCheckingPassword, setIsCheckingPassword] = useState(false);
       const [loginError, setLoginError] = useState('');
@@ -288,6 +399,7 @@
         if (!gasUrl) {
           if (adminPasswordInput === 'admin') {
             setIsAdminAuth(true);
+            localStorage.setItem('admin_auth_until', String(Date.now() + ADMIN_SESSION_MS));
             setAdminPasswordInput('');
           } else {
             setLoginError('密碼錯誤 (Local Mode: 預設為 admin)');
@@ -302,6 +414,7 @@
           const json = await res.json();
           if (json.status === 'success' && json.valid) {
             setIsAdminAuth(true);
+            localStorage.setItem('admin_auth_until', String(Date.now() + ADMIN_SESSION_MS));
             setAdminPasswordInput('');
           } else {
             setLoginError('密碼錯誤，請重新輸入。');
@@ -314,10 +427,18 @@
         }
       };
 
-      // Reset auth when leaving admin tab
+      // 後台登入狀態保留 30 分鐘，逾時才自動登出。
       useEffect(() => {
-        if (activeTab !== 'admin') setIsAdminAuth(false);
-      }, [activeTab]);
+        const checkAdminSession = () => {
+          if (Number(localStorage.getItem('admin_auth_until') || 0) <= Date.now()) {
+            setIsAdminAuth(false);
+            localStorage.removeItem('admin_auth_until');
+          }
+        };
+        checkAdminSession();
+        const timer = setInterval(checkAdminSession, 30000);
+        return () => clearInterval(timer);
+      }, []);
 
       // Form State
       const [applicantName, setApplicantName] = useState('');
@@ -326,16 +447,16 @@
       const [county, setCounty] = useState('苗栗縣');
       const [district, setDistrict] = useState('三義鄉');
       const [detailAddress, setDetailAddress] = useState('');
-      const [selectedItems, setSelectedItems] = useState([
-        { categoryId: 'mattress', categoryName: '床墊', name: '雙人彈簧床墊', quantity: 1, note: '' }
-      ]);
+      const [selectedItems, setSelectedItems] = useState([]);
       const [photos, setPhotos] = useState([]);
       const defaultDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
       const [preferredDate, setPreferredDate] = useState(defaultDate);
-      const [preferredTimeSlot, setPreferredTimeSlot] = useState('上午 (08:00 - 12:00)');
+      const [preferredTimeSlot, setPreferredTimeSlot] = useState('上午8點至12點');
       const [locationNote, setLocationNote] = useState('');
       const [agreedTerms, setAgreedTerms] = useState([]);
       const [errors, setErrors] = useState({});
+      const [isSubmitting, setIsSubmitting] = useState(false);
+      const [submitSecondsLeft, setSubmitSecondsLeft] = useState(0);
 
       // Completion Photo Upload State for Sanitation Worker
       const [completionPhotoBase64, setCompletionPhotoBase64] = useState('');
@@ -370,6 +491,8 @@
         const found = selectedItems.find((i) => i.categoryId === catId);
         return found ? found.quantity : 0;
       };
+      const getItemNote = (catId) => selectedItems.find((i) => i.categoryId === catId)?.note || '';
+      const handleItemNoteChange = (catId, note) => setSelectedItems((prev) => prev.map((i) => i.categoryId === catId ? { ...i, note, name: catId === 'other' ? (note || '其他') : i.name } : i));
 
       // Photo Drag & Drop
       const handleFileUpload = (e) => {
@@ -378,10 +501,15 @@
           if (!file.type.startsWith('image/')) return;
           const reader = new FileReader();
           reader.onload = (ev) => {
-            setPhotos((prev) => [
-              ...prev,
-              { id: Date.now() + Math.random(), name: file.name, url: ev.target.result }
-            ]);
+            const image = new Image();
+            image.onload = () => {
+              const scale = Math.min(1, 1600 / Math.max(image.width, image.height));
+              const canvas = document.createElement('canvas');
+              canvas.width = Math.round(image.width * scale); canvas.height = Math.round(image.height * scale);
+              canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+              setPhotos((prev) => [...prev, { id: Date.now() + Math.random(), name: file.name.replace(/\.[^.]+$/, '') + '.jpg', url: canvas.toDataURL('image/jpeg', 0.84) }]);
+            };
+            image.src = ev.target.result;
           };
           reader.readAsDataURL(file);
         });
@@ -402,6 +530,7 @@
       // Form Validation & Submission
       const handleFormSubmit = async (e) => {
         e.preventDefault();
+        if (isSubmitting) return;
         const errs = {};
         if (!applicantName.trim()) errs.applicantName = '請輸入申請人姓名';
         if (!phone.trim()) errs.phone = '請輸入聯絡電話';
@@ -418,8 +547,22 @@
           return;
         }
 
+        const estimatedSeconds = photos.length > 0 ? Math.min(10, 2 + photos.length * 2) : 1;
+        setIsSubmitting(true);
+        setSubmitSecondsLeft(estimatedSeconds);
+        const countdownTimer = setInterval(() => setSubmitSecondsLeft((seconds) => Math.max(0, seconds - 1)), 1000);
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        const bookingDate = new Date();
+        const bookingPrefix = `${bookingDate.getFullYear() - 1911}-${String(bookingDate.getMonth() + 1).padStart(2, '0')}${String(bookingDate.getDate()).padStart(2, '0')}-`;
+        const dailySequences = bookings
+          .filter((booking) => String(booking.id || '').startsWith(bookingPrefix))
+          .map((booking) => Number(String(booking.id).slice(bookingPrefix.length)))
+          .filter(Number.isFinite);
+        const bookingId = bookingPrefix + String(Math.max(0, ...dailySequences) + 1).padStart(3, '0');
+
         const newBooking = {
-          id: `FUR-${getMinguoCompactStr()}-${Math.floor(1000 + Math.random() * 9000)}`,
+          id: bookingId,
           applicantName,
           phone,
           email,
@@ -440,15 +583,38 @@
         // Guaranteed Sync to Google Sheets via GET parameter request
         if (gasUrl) {
           try {
-            const syncUrl = gasUrl + '?action=createBooking&data=' + encodeURIComponent(JSON.stringify(newBooking));
-            fetch(syncUrl, { mode: 'no-cors' }).catch(err => console.log(err));
+            // GAS 的 createBooking 目前由 doGet 處理；Base64 圖片不可放進 URL，僅傳送表單欄位。
+            const sheetBooking = { ...newBooking, photos: [] };
+            const syncUrl = gasUrl + '?action=createBooking&data=' + encodeURIComponent(JSON.stringify(sheetBooking));
+            await Promise.race([
+              fetch(syncUrl, { mode: 'no-cors' }),
+              new Promise((resolve) => setTimeout(resolve, estimatedSeconds * 1000))
+            ]);
+            await Promise.race([
+              Promise.all(photos.map((photo, index) => fetch(gasUrl, {
+                method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ action: 'uploadBookingPhoto', id: bookingId, fileBase64: photo.url, fileName: `${bookingId}-${index + 1}.jpg` })
+              }))),
+              new Promise((resolve) => setTimeout(resolve, estimatedSeconds * 1000))
+            ]);
           } catch (e) {
             console.error('GAS Sync Error:', e);
           }
         }
 
-        setBookings((prev) => [newBooking, ...prev]);
-        setSuccessBooking(newBooking);
+        try {
+          await new Promise((resolve) => setTimeout(resolve, 250));
+          setBookings((prev) => [newBooking, ...prev]);
+          setSuccessBooking(newBooking);
+          setApplicantName(''); setPhone(''); setEmail(''); setCounty('苗栗縣'); setDistrict('三義鄉');
+          setDetailAddress(''); setSelectedItems([]); setPhotos([]); setPreferredDate(defaultDate);
+          setPreferredTimeSlot('上午8點至12點'); setLocationNote(''); setAgreedTerms([]); setErrors({}); setActiveTab('booking');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        } finally {
+          clearInterval(countdownTimer);
+          setSubmitSecondsLeft(0);
+          setIsSubmitting(false);
+        }
       };
 
       // Search Query Logic
@@ -496,10 +662,18 @@
       const handleCompletionPhotoFileChange = (e) => {
         const file = e.target.files[0];
         if (!file) return;
-        setCompletionPhotoName(file.name);
         const reader = new FileReader();
         reader.onload = (ev) => {
-          setCompletionPhotoBase64(ev.target.result);
+          const image = new Image();
+          image.onload = () => {
+            const scale = Math.min(1, 1600 / Math.max(image.width, image.height));
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.round(image.width * scale); canvas.height = Math.round(image.height * scale);
+            canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+            setCompletionPhotoBase64(canvas.toDataURL('image/jpeg', 0.84));
+            setCompletionPhotoName(`${completionModalBooking.id.split('-').slice(0, 2).join('-')}-close-1.jpg`);
+          };
+          image.src = ev.target.result;
         };
         reader.readAsDataURL(file);
       };
@@ -544,7 +718,7 @@
                 action: 'completeWithPhoto',
                 id: bookingId,
                 fileBase64: completionPhotoBase64,
-                fileName: completionPhotoName || `completion_${bookingId}.jpg`,
+                fileName: `${bookingId.split('-').slice(0, 2).join('-')}-close-1.jpg`,
                 note: completionNote
               })
             });
@@ -564,12 +738,12 @@
         const headers = ['預約單號', '申請時間', '申請人', '電話', '行政區', '詳細地址', '預約日期', '品項明細', '狀態'];
         const rows = bookings.map((b) => [
           b.id,
-          b.createdAt,
+          getMinguoTime(b.createdAt),
           b.applicantName,
           b.phone,
           b.district,
           `"${b.address}"`,
-          b.preferredDate,
+          formatMinguoDate(b.preferredDate),
           `"${b.items.map((i) => `${i.name}x${i.quantity}`).join(';')}"`,
           b.status
         ]);
@@ -585,112 +759,50 @@
       const pendingCount = bookings.filter((b) => b.status === '已收件' || b.status === '待審核').length;
 
       return (
-        <div className="min-h-screen flex flex-col">
+        <div className="civic-shell min-h-screen flex flex-col">
           
           {/* Header */}
-          <header className="sticky top-0 z-40 bg-slate-900/90 backdrop-blur-md border-b border-emerald-500/20 text-slate-100 shadow-xl no-print">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col md:flex-row items-center justify-between gap-4">
-              
-              <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setActiveTab('booking')}>
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20 text-slate-950 font-black text-2xl">
-                  🚚
-                </div>
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <h1 className="text-xl sm:text-2xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-emerald-300 via-teal-200 to-emerald-100">
-                      大型廢棄傢俱預約清運系統
-                    </h1>
-                    <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                      Google Drive 拍照結案版
+          <header className="sticky top-0 z-40 border-b border-emerald-900/10 bg-white/90 text-slate-800 shadow-[0_8px_30px_-24px_rgba(6,78,59,.45)] backdrop-blur-xl no-print">
+            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+              <div className="flex min-h-20 items-center justify-between gap-3 py-3">
+                <button className="group flex min-w-0 items-center gap-3 text-left" onClick={() => setActiveTab('booking')} aria-label="回到線上預約首頁">
+                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-700 text-xl text-white shadow-lg transition-transform group-hover:-translate-y-0.5">🚚</span>
+                  <span className="min-w-0">
+                    <span className="flex items-center gap-2">
+                      <span className="truncate text-base font-black tracking-tight text-emerald-950 sm:text-xl">大型傢俱清運</span>
+                      <span className="hidden rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700 xl:inline">Google 雲端版</span>
                     </span>
-                  </div>
-                  <p className="text-xs text-slate-400 font-medium">線上申請 ‧ 車輛調度 ‧ Google Drive 現場照片自動上傳</p>
-                </div>
-              </div>
-
-              {/* Navigation & GAS Config */}
-              <div className="flex items-center space-x-3">
-                <button
-                  onClick={() => setShowGasModal(true)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all flex items-center space-x-1.5 ${
-                    gasUrl
-                      ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/20'
-                      : 'bg-amber-500/10 text-amber-300 border-amber-500/40 animate-pulse'
-                  }`}
-                >
-                  <span>📊</span>
-                  <span>{gasUrl ? 'Google Sheet/Drive 已連線' : '⚙️ 設定 Google 雲端庫'}</span>
+                    <span className="mt-0.5 hidden text-xs font-medium text-slate-400 sm:block">市民線上申請、進度查詢與清運管理</span>
+                  </span>
                 </button>
-
-                <button
-                  onClick={fetchFromGoogleSheets}
-                  disabled={isSyncingGas}
-                  className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 text-xs font-bold"
-                  title="立即從 Google 試算表拉取最新資料"
-                >
-                  {isSyncingGas ? '⌛ 同步中...' : '🔄 重新載入雲端紀錄'}
-                </button>
-
-                <nav className="flex items-center bg-slate-800/80 p-1.5 rounded-xl border border-slate-700/60">
-                  <button
-                    onClick={() => setActiveTab('booking')}
-                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-                      activeTab === 'booking'
-                        ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 shadow-md'
-                        : 'text-slate-300 hover:text-white'
-                    }`}
-                  >
-                    📝 線上預約申請
-                  </button>
-
-                  <button
-                    onClick={() => setActiveTab('query')}
-                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-                      activeTab === 'query'
-                        ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 shadow-md'
-                        : 'text-slate-300 hover:text-white'
-                    }`}
-                  >
-                    🔍 預約進度查詢
-                  </button>
-
-                  <button
-                    onClick={() => setActiveTab('admin')}
-                    className={`relative px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-                      activeTab === 'admin'
-                        ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 shadow-md'
-                        : 'text-slate-300 hover:text-white'
-                    }`}
-                  >
-                    🚚 清潔隊後台
-                    {pendingCount > 0 && (
-                      <span className="ml-1 bg-amber-500 text-slate-950 text-xs font-black px-1.5 py-0.5 rounded-full animate-pulse">
-                        {pendingCount}
-                      </span>
-                    )}
-                  </button>
+                <nav className="flex shrink-0 items-center gap-1 rounded-2xl border border-slate-200 bg-slate-50 p-1" aria-label="市民服務">
+                  {[['booking','📝','線上預約'],['query','🔍','進度查詢']].map(([id, icon, label]) => (
+                    <button key={id} onClick={() => setActiveTab(id)} aria-current={activeTab === id ? 'page' : undefined} className={'flex min-h-10 items-center gap-2 rounded-xl px-3 text-sm font-bold transition-all sm:px-4 ' + (activeTab === id ? 'bg-emerald-700 text-white shadow-md shadow-emerald-900/10' : 'text-slate-600 hover:bg-emerald-50 hover:text-emerald-800')}>
+                      <span>{icon}</span><span className="hidden sm:inline">{label}</span>
+                    </button>
+                  ))}
                 </nav>
               </div>
-
+              
             </div>
           </header>
 
           {/* Main Content View */}
-          <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 no-print">
+          <main className="relative z-10 flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-7 sm:py-12 no-print">
             
             {/* TAB 1: Booking Wizard Form */}
             {activeTab === 'booking' && (
               <form onSubmit={handleFormSubmit} className="max-w-4xl mx-auto space-y-8">
                 
                 {/* Hero Banner */}
-                <div className="relative rounded-3xl p-6 sm:p-8 bg-gradient-to-r from-slate-900 via-slate-850 to-emerald-950 border border-emerald-500/30 shadow-2xl overflow-hidden">
+                <div className="booking-hero relative rounded-[2rem] p-6 sm:p-9 border border-emerald-200 shadow-xl overflow-hidden">
                   <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                     <div>
-                      <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 mb-3">
+                      <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-white/80 text-emerald-800 border border-emerald-200 mb-3 shadow-sm">
                         ✨ 環保免費服務 ‧ Google Sheets 雲端連線
                       </span>
-                      <h2 className="text-2xl sm:text-3xl font-black text-white">大型廢棄傢俱免費清運預約申請</h2>
-                      <p className="text-xs sm:text-sm text-slate-300 mt-2 max-w-xl">
+                      <h2 className="text-2xl sm:text-4xl font-black text-emerald-950">大型廢棄傢俱免費清運預約申請</h2>
+                      <p className="text-xs sm:text-sm text-slate-600 mt-3 max-w-xl leading-relaxed">
                         提供床墊、櫃子、桌子、椅子、電視冰箱等家電清運。請填寫下方資料與上傳照片，送出後即獲取標籤與 QR Code。
                       </p>
                     </div>
@@ -764,7 +876,7 @@
                         </label>
                         <select
                           value={county}
-                          onChange={(e) => setCounty(e.target.value)}
+                          onChange={(e) => { const next = e.target.value; setCounty(next); setDistrict(DISTRICTS_BY_COUNTY[next][0]); }}
                           className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-emerald-500"
                         >
                           {COUNTIES.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -775,13 +887,11 @@
                         <label className="block text-xs font-bold text-slate-300 mb-1">
                           行政區域 <span className="text-rose-400">*</span>
                         </label>
-                        <input
-                          type="text"
+                        <select
                           value={district}
                           onChange={(e) => setDistrict(e.target.value)}
-                          placeholder="例如: 三義鄉"
                           className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-emerald-500"
-                        />
+                        >{DISTRICTS_BY_COUNTY[county].map((d) => <option key={d} value={d}>{d}</option>)}</select>
                       </div>
 
                       <div className="sm:col-span-2">
@@ -821,17 +931,18 @@
                           key={cat.id}
                           className={`p-4 rounded-xl border transition-all ${
                             isSelected
-                              ? 'bg-slate-800 border-emerald-500/50 shadow-md ring-1 ring-emerald-500/20'
-                              : 'bg-slate-800/40 border-slate-700/60 hover:bg-slate-800/70'
+                              ? 'bg-emerald-950 border-emerald-300 shadow-md ring-2 ring-emerald-400'
+                              : 'bg-slate-900 border-slate-600 hover:border-slate-400'
                           }`}
                         >
                           <div className="flex items-center space-x-3">
-                            <span className="text-3xl p-2 rounded-xl bg-slate-900 border border-slate-700">{cat.icon}</span>
+                            <span className={`text-3xl p-2 rounded-xl border ${isSelected ? 'bg-white border-white/70' : 'bg-slate-900 border-slate-700'}`}>{cat.icon}</span>
                             <div>
-                              <h4 className="font-bold text-slate-100">{cat.name}</h4>
-                              <p className="text-xs text-slate-400">{cat.desc}</p>
+                              <h4 className={`font-black ${isSelected ? '!text-white' : 'text-slate-100'}`}>{cat.name}</h4>
+                              <p className={`text-xs ${isSelected ? '!text-emerald-100' : 'text-slate-400'}`}>{cat.desc}</p>
                             </div>
                           </div>
+                          <div className={`mt-3 rounded-lg px-3 py-1.5 text-center text-xs font-black ${isSelected ? 'bg-emerald-400 text-emerald-950' : 'bg-slate-700 text-slate-200'}`}>{isSelected ? '✓ 已選取' : '未選取'}</div>
 
                           <div className="mt-4 pt-3 border-t border-slate-700/50 flex items-center justify-between">
                             <span className="text-xs text-slate-400">選擇數量:</span>
@@ -854,6 +965,7 @@
                               </button>
                             </div>
                           </div>
+                          {isSelected && cat.id === 'other' && <input type="text" value={getItemNote(cat.id)} onChange={(e) => handleItemNoteChange(cat.id, e.target.value)} placeholder="請填寫其他清運項目內容" className="mt-3 w-full rounded-lg border border-emerald-500 bg-slate-950 px-3 py-2 text-xs text-slate-100 placeholder-slate-500" />}
                         </div>
                       );
                     })}
@@ -870,19 +982,8 @@
                     <span className="text-xs text-slate-400">已上傳 <strong className="text-emerald-400">{photos.length}</strong> 張</span>
                   </div>
 
-                  <div className="border-2 border-dashed border-slate-700 rounded-2xl p-6 text-center hover:border-emerald-500/50 bg-slate-900/40 cursor-pointer">
-                    <input type="file" accept="image/*" multiple onChange={handleFileUpload} className="hidden" id="photo-input" />
-                    <label htmlFor="photo-input" className="cursor-pointer space-y-2 block">
-                      <div className="text-3xl">📷</div>
-                      <p className="text-sm font-bold text-slate-200">點擊上傳照片 或 將照片拖曳至此</p>
-                      <p className="text-xs text-slate-400">請清晰拍攝家具全貌與尺寸細節</p>
-                    </label>
-                  </div>
-
-
-
-                  {photos.length > 0 && (
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+                  <input type="file" accept="image/*" multiple onChange={handleFileUpload} className="hidden" id="photo-input" />
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
                       {photos.map((p) => (
                         <div key={p.id} className="relative rounded-xl overflow-hidden bg-slate-900 border border-slate-700 group">
                           <img src={p.url} className="w-full h-24 object-cover" />
@@ -896,8 +997,12 @@
                           <span className="block p-1 text-[10px] truncate text-slate-300 bg-slate-950/80">{p.name}</span>
                         </div>
                       ))}
-                    </div>
-                  )}
+                    <label htmlFor="photo-input" className="h-24 rounded-xl border-2 border-dashed border-emerald-500/50 bg-slate-900/40 hover:bg-emerald-500/10 cursor-pointer flex flex-col items-center justify-center gap-1 transition-all">
+                      <span className="text-xl">📷</span>
+                      <span className="text-xs font-bold text-slate-200">上傳照片</span>
+                      <span className="text-[10px] text-slate-400">可選多張</span>
+                    </label>
+                  </div>
                 </div>
 
                 {/* Step 4: Schedule & Location */}
@@ -912,10 +1017,12 @@
                       <label className="block text-xs font-bold text-slate-300 mb-1">約定清運日期</label>
                       <input
                         type="date"
+                        min={new Date().toISOString().split('T')[0]}
                         value={preferredDate}
                         onChange={(e) => setPreferredDate(e.target.value)}
                         className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100"
                       />
+                      <p className="mt-1 text-[11px] text-slate-400">民國日期：{formatMinguoDate(preferredDate)}</p>
                     </div>
 
                     <div>
@@ -925,8 +1032,8 @@
                         onChange={(e) => setPreferredTimeSlot(e.target.value)}
                         className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100"
                       >
-                        <option value="上午 (08:00 - 12:00)">上午時段 (08:00 - 12:00)</option>
-                        <option value="下午 (13:00 - 17:00)">下午時段 (13:00 - 17:00)</option>
+                        <option value="上午8點至12點">上午8點至12點</option>
+                        <option value="下午1點至5點">下午1點至5點</option>
                       </select>
                     </div>
 
@@ -944,52 +1051,61 @@
                 </div>
 
                 {/* Step 5: Terms Consent */}
-                <div className="glass-card rounded-2xl p-6 border border-slate-700/60 shadow-xl space-y-4">
-                  <div className="flex items-center justify-between">
+                <div className="glass-card rounded-2xl p-6 border border-slate-700/60 shadow-xl space-y-5">
+                  <div>
                     <h3 className="text-lg font-bold text-slate-100 flex items-center">
                       <span className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center mr-2 text-sm border border-emerald-500/30">5</span>
                       申請聲明與同意事項 (必填)
                     </h3>
-                    <button
-                      type="button"
-                      onClick={() => setAgreedTerms(isAllTermsAgreed ? [] : TERMS_LIST.map(t=>t.id))}
-                      className="text-xs font-bold px-3 py-1 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/30"
-                    >
-                      {isAllTermsAgreed ? '取消全選' : '一鍵全選並同意'}
-                    </button>
+                    <p className="text-xs text-slate-400 mt-1 ml-10">
+                      依廢棄物清理法及清潔隊規定，請完整閱讀以下事項後勾選同意。
+                    </p>
                   </div>
 
-                  <div className="space-y-3">
-                    {TERMS_LIST.map((t) => {
-                      const checked = agreedTerms.includes(t.id);
-                      return (
-                        <div
-                          key={t.id}
-                          onClick={() => handleToggleTerm(t.id)}
-                          className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
-                            checked ? 'bg-slate-800 border-emerald-500/50' : 'bg-slate-900/40 border-slate-700/60'
-                          }`}
-                        >
-                          <div className="flex items-start space-x-3">
-                            <span className="text-emerald-400 text-lg font-bold">{checked ? '☑' : '☐'}</span>
-                            <div>
-                              <h4 className="text-xs font-bold text-slate-200">{t.id}. {t.title}</h4>
-                              <p className="text-xs text-slate-300 mt-0.5">{t.content}</p>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
+                  <div className="overflow-x-auto rounded-xl border border-slate-700/60">
+                    <table className="w-full min-w-[640px] text-left text-xs">
+                      <thead className="bg-emerald-50 text-emerald-900">
+                        <tr>
+                          <th className="w-14 px-4 py-3 text-center font-bold">項次</th>
+                          <th className="w-44 px-4 py-3 font-bold">聲明事項</th>
+                          <th className="px-4 py-3 font-bold">內容說明</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800">
+                        {TERMS_LIST.map((t) => (
+                          <tr key={t.id} className="align-top">
+                            <td className="px-4 py-3 text-center font-black text-emerald-700">{t.id}</td>
+                            <td className="px-4 py-3 font-bold text-slate-200">{t.title}</td>
+                            <td className="px-4 py-3 leading-relaxed text-slate-300">{t.content}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
+
+                  <button
+                    type="button"
+                    role="checkbox"
+                    aria-checked={isAllTermsAgreed}
+                    onClick={() => setAgreedTerms(isAllTermsAgreed ? [] : TERMS_LIST.map(t => t.id))}
+                    className={`flex w-full items-start gap-3 rounded-xl border p-4 text-left transition-all ${
+                      isAllTermsAgreed
+                        ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-800'
+                        : 'border-slate-700/60 bg-white/60 text-slate-700 hover:border-emerald-400'
+                    }`}
+                  >
+                    <span className="mt-0.5 text-lg font-bold text-emerald-600">{isAllTermsAgreed ? '☑' : '☐'}</span>
+                    <span className="text-sm font-bold">我已詳讀並同意配合以上事項 (閱讀後，請勾選)</span>
+                  </button>
                 </div>
-
                 {/* Submit button */}
                 <div className="flex justify-end">
                   <button
                     type="submit"
-                    className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-black text-base shadow-xl hover:from-emerald-400 hover:to-teal-400 transition-all flex items-center justify-center space-x-2"
+                    disabled={isSubmitting}
+                    className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-black text-base shadow-xl hover:from-emerald-400 hover:to-teal-400 transition-all flex items-center justify-center space-x-2 disabled:cursor-wait disabled:opacity-70"
                   >
-                    <span>✅ 送出大型廢棄傢俱預約清運申請</span>
+                    <span>{isSubmitting ? `⏳ 送出處理中${photos.length > 0 && submitSecondsLeft > 0 ? `，預估還有 ${submitSecondsLeft} 秒` : '…'}` : '✅ 送出大型廢棄傢俱預約清運申請'}</span>
                   </button>
                 </div>
 
@@ -1004,7 +1120,7 @@
                   <form onSubmit={handleSearchSubmit} className="flex gap-3">
                     <input
                       type="text"
-                      placeholder="請輸入手機號碼 (如 0912-345-678) 或預約單號 (FUR-...)"
+                      placeholder="請輸入手機號碼 (如 0912-345-678) 或預約單號 (如 115-0815-001)"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-100"
@@ -1014,18 +1130,7 @@
                     </button>
                   </form>
 
-                  <div className="flex items-center space-x-2 text-xs">
-                    <span className="text-slate-400">快捷點擊查詢:</span>
-                    {bookings.slice(0, 3).map((b) => (
-                      <button
-                        key={b.id}
-                        onClick={() => { setSearchQuery(b.phone); setSearchResults([b]); setHasSearched(true); }}
-                        className="px-2 py-1 rounded bg-slate-800 text-emerald-400 border border-slate-700"
-                      >
-                        {b.applicantName} ({b.phone})
-                      </button>
-                    ))}
-                  </div>
+                  <p className="text-[11px] text-slate-400">為保護個人資料，請自行輸入電話或預約單號查詢；本頁不公開顯示他人的快捷查詢資料。</p>
                 </div>
 
                 {hasSearched && (
@@ -1050,7 +1155,7 @@
 
                         <div className="grid grid-cols-2 gap-3 text-xs">
                           <div><span className="text-slate-400">申請人：</span><strong>{b.applicantName} ({b.phone})</strong></div>
-                          <div><span className="text-slate-400">約定日期：</span><strong>{b.preferredDate} ({b.preferredTimeSlot.split(' ')[0]})</strong></div>
+                          <div><span className="text-slate-400">約定日期：</span><strong>{formatMinguoDate(b.preferredDate)} ({b.preferredTimeSlot.split(' ')[0]})</strong></div>
                           <div className="col-span-2"><span className="text-slate-400">地址：</span><strong>{b.address}</strong></div>
                           <div className="col-span-2"><span className="text-slate-400">品項：</span><strong className="text-emerald-400">{b.itemsChinese || b.items?.map(i => `${i.name}x${i.quantity}`).join(', ')}</strong></div>
                         </div>
@@ -1062,7 +1167,7 @@
                             <div key={idx} className="text-xs text-slate-300 flex items-start space-x-2">
                               <span className="text-emerald-400">•</span>
                               <div>
-                                <span className="font-bold">{t.status}</span> ({t.time})
+                                <span className="font-bold">{t.status}</span> ({getMinguoTime(t.time)})
                                 {t.note && <p className="text-slate-400 text-[11px]">{t.note}</p>}
                                 {t.drivePhotoUrl && (
                                   <div className="mt-1 space-y-1">
@@ -1122,7 +1227,7 @@
                         <p className="text-xs text-slate-400">支援核可排班與現場拍照結案，照片自動上傳至 Google Drive 備查</p>
                       </div>
                       <div className="flex items-center space-x-3">
-                        <button onClick={() => setIsAdminAuth(false)} className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold border border-slate-700 hover:text-white">
+                        <button onClick={() => { setIsAdminAuth(false); localStorage.removeItem('admin_auth_until'); }} className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold border border-slate-700 hover:text-white">
                           登出
                         </button>
                         <button onClick={handleExportCSV} className="px-4 py-2 rounded-xl bg-slate-800 text-emerald-400 text-xs font-bold border border-slate-700">
@@ -1181,7 +1286,7 @@
                                   </>
                                 )}
                               </td>
-                              <td className="p-3 font-semibold">{b.preferredDate}</td>
+                              <td className="p-3 font-semibold">{formatMinguoDate(b.preferredDate)}</td>
                               <td className="p-3 text-emerald-300">{b.itemsChinese || b.items?.map(i => `${i.name}x${i.quantity}`).join('; ')}</td>
                               <td className="p-3 font-bold">
                                 <span className={`px-2 py-0.5 rounded text-[11px] ${
@@ -1372,8 +1477,8 @@
                 
                 {gasUrl && <p className="text-[11px] text-emerald-300">雲端同步狀態：已自動同步寫入至您的 Google 試算表！</p>}
 
-                <div className="bg-slate-950 p-4 rounded-xl text-left text-xs space-y-1 text-slate-300 border border-slate-800">
-                  <p><strong>約定清運日期：</strong>{successBooking.preferredDate} ({successBooking.preferredTimeSlot.split(' ')[0]})</p>
+                <div className="success-summary bg-slate-950 p-4 rounded-xl text-left text-xs space-y-1 text-white border border-slate-800">
+                  <p><strong>約定清運日期：</strong>{formatMinguoDate(successBooking.preferredDate)} ({successBooking.preferredTimeSlot.split(' ')[0]})</p>
                   <p><strong>一樓放置地點：</strong>{successBooking.address}</p>
                   <p><strong>清運品項：</strong>{successBooking.items?.map(i=>`${i.name}x${i.quantity}`).join('、')}</p>
                 </div>
@@ -1383,7 +1488,7 @@
                 >
                   🖨️ 立即列印「已預約清運標籤」與 QR Code
                 </button>
-                <button onClick={() => setSuccessBooking(null)} className="text-xs text-slate-400">關閉</button>
+                <button onClick={() => { setSuccessBooking(null); setActiveTab('booking'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="text-xs font-bold text-emerald-300">回到申請頁面</button>
               </div>
             </div>
           )}
@@ -1398,9 +1503,9 @@
                 </div>
 
                 {/* Printable Area */}
-                <div id="printable-tag" className="bg-white text-slate-900 rounded-xl p-6 border-4 border-dashed border-slate-900 space-y-4">
-                  <div className="flex justify-between items-start border-b-2 border-slate-900 pb-3">
-                    <div>
+                <div id="printable-tag" className="bg-white text-slate-900 text-center rounded-xl p-6 border-4 border-dashed border-slate-900 space-y-4 mx-auto">
+                  <div className="flex flex-col items-center border-b-2 border-slate-900 pb-3 gap-3">
+                    <div className="text-center">
                       <span className="bg-slate-900 text-white text-[10px] font-bold px-2 py-0.5 rounded">家戶免費清運專案</span>
                       <h2 className="text-xl font-black mt-1">大型廢棄傢俱已預約清運標籤</h2>
                       <p className="text-xs text-slate-600 font-bold">請貼於搬出傢俱外觀明顯處 ‧ 清潔隊現場掃碼核對</p>
@@ -1410,7 +1515,7 @@
 
                   <div className="grid grid-cols-2 gap-3 bg-slate-100 p-3 rounded-lg border border-slate-300 text-xs">
                     <div><span className="text-slate-500 block">預約單號</span><strong className="text-emerald-800 text-base font-mono">{printableBooking.id}</strong></div>
-                    <div><span className="text-slate-500 block">約定清運日期</span><strong className="text-slate-900 text-sm">{printableBooking.preferredDate}</strong></div>
+                    <div><span className="text-slate-500 block">約定清運日期</span><strong className="text-slate-900 text-sm">{formatMinguoDate(printableBooking.preferredDate)}</strong></div>
                     <div><span className="text-slate-500 block">申請人姓名</span><strong className="text-slate-900">{printableBooking.applicantName}</strong></div>
                     <div><span className="text-slate-500 block">聯絡電話</span><strong className="text-slate-900 font-mono">{printableBooking.phone}</strong></div>
                   </div>
@@ -1435,7 +1540,7 @@
 
                   <div className="pt-2 border-t border-slate-300 text-[10px] text-slate-500 flex justify-between">
                     <span>※ 請勿夾雜事業廢棄物或危險物品 ‧ 清潔隊客服: (02) 2720-8889</span>
-                    <span>列印日期: {getMinguoTime().split(' ')[0]}</span>
+                    <span>列印日期: {formatMinguoDate(new Date())}</span>
                   </div>
                 </div>
 
@@ -1448,7 +1553,7 @@
           )}
 
           {/* Footer */}
-          <footer className="mt-16 bg-slate-900 border-t border-slate-800 text-slate-400 py-8 no-print text-xs text-center space-y-2">
+          <footer className="mt-16 bg-emerald-950 border-t border-emerald-900 text-emerald-100/70 py-9 no-print text-xs text-center space-y-2">
             <p>大型廢棄傢俱預約清運管理系統 ‧ 市民服務專線 1999 ‧ 清潔隊客服 (02) 2720-8889</p>
             <p className="text-slate-500">© 2026 環保局家戶大型廢棄物清運專區. All rights reserved.</p>
           </footer>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, CheckSquare, Square, AlertTriangle, FileText } from 'lucide-react';
+import { ShieldCheck, CheckSquare, Square, AlertTriangle } from 'lucide-react';
 
 export const TERMS_LIST = [
   {
@@ -32,96 +32,67 @@ export const TERMS_LIST = [
 export default function TermsConsent({ agreedTerms, setAgreedTerms }) {
   const isAllAgreed = TERMS_LIST.every((term) => agreedTerms.includes(term.id));
 
-  const handleToggleSingle = (id) => {
-    if (agreedTerms.includes(id)) {
-      setAgreedTerms(agreedTerms.filter((item) => item !== id));
-    } else {
-      setAgreedTerms([...agreedTerms, id]);
-    }
-  };
-
   const handleToggleAll = () => {
-    if (isAllAgreed) {
-      setAgreedTerms([]);
-    } else {
-      setAgreedTerms(TERMS_LIST.map((t) => t.id));
-    }
+    setAgreedTerms(isAllAgreed ? [] : TERMS_LIST.map((term) => term.id));
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div>
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold text-slate-100 flex items-center">
-            <span className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center mr-2 text-sm border border-emerald-500/30">
-              5
-            </span>
-            申請聲明與同意事項（請逐項確認）
-          </h3>
-          <button
-            type="button"
-            onClick={handleToggleAll}
-            className="text-xs font-bold px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 border border-emerald-500/30 transition-all flex items-center space-x-1"
-          >
-            <ShieldCheck className="w-3.5 h-3.5" />
-            <span>{isAllAgreed ? '取消全部勾選' : '一鍵全選並同意'}</span>
-          </button>
-        </div>
+        <h3 className="text-lg font-bold text-slate-100 flex items-center">
+          <span className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center mr-2 text-sm border border-emerald-500/30">5</span>
+          申請聲明與同意事項 (必填)
+        </h3>
         <p className="text-xs text-slate-400 mt-1 ml-10">
-          依廢棄物清理法及清潔隊規定，請閱讀並勾選同意以下條款後方可送出預約申請。
+          依廢棄物清理法及清潔隊規定，請完整閱讀以下事項後勾選同意。
         </p>
       </div>
 
-      <div className="space-y-3">
-        {TERMS_LIST.map((term) => {
-          const isChecked = agreedTerms.includes(term.id);
-          return (
-            <div
-              key={term.id}
-              onClick={() => handleToggleSingle(term.id)}
-              className={`p-4 rounded-xl cursor-pointer border transition-all duration-200 ${
-                isChecked
-                  ? 'bg-slate-800/90 border-emerald-500/50 shadow-md ring-1 ring-emerald-500/20'
-                  : 'bg-slate-850/40 border-slate-700/60 hover:border-slate-600 hover:bg-slate-800/50'
-              }`}
-            >
-              <div className="flex items-start space-x-3">
-                <div className="mt-0.5 text-emerald-400">
-                  {isChecked ? (
-                    <CheckSquare className="w-5 h-5 fill-emerald-500/20 text-emerald-400" />
-                  ) : (
-                    <Square className="w-5 h-5 text-slate-500" />
-                  )}
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center space-x-2">
-                    <span className="text-xs font-bold px-2 py-0.5 rounded bg-slate-700 text-slate-300">
-                      條款 {term.id}
-                    </span>
-                    <h4 className={`text-sm font-bold ${isChecked ? 'text-emerald-300' : 'text-slate-200'}`}>
-                      {term.title}
-                    </h4>
-                  </div>
-                  <p className="text-xs text-slate-300 mt-1.5 leading-relaxed">
-                    {term.content}
-                  </p>
-                </div>
-              </div>
-            </div>
-          );
-        })}
+      <div className="overflow-hidden rounded-xl border border-slate-700/60">
+        <table className="w-full text-left text-xs">
+          <thead className="bg-emerald-50 text-emerald-900">
+            <tr>
+              <th className="w-14 px-4 py-3 text-center font-bold">項次</th>
+              <th className="w-44 px-4 py-3 font-bold">聲明事項</th>
+              <th className="px-4 py-3 font-bold">內容說明</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-800">
+            {TERMS_LIST.map((term) => (
+              <tr key={term.id} className="align-top">
+                <td className="px-4 py-3 text-center font-black text-emerald-700">{term.id}</td>
+                <td className="px-4 py-3 font-bold text-slate-200">{term.title}</td>
+                <td className="px-4 py-3 leading-relaxed text-slate-300">{term.content}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
-      {/* Status Warning Banner */}
+      <button
+        type="button"
+        role="checkbox"
+        aria-checked={isAllAgreed}
+        onClick={handleToggleAll}
+        className={`flex w-full items-start gap-3 rounded-xl border p-4 text-left transition-all ${
+          isAllAgreed
+            ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-800'
+            : 'border-slate-700/60 bg-white/60 text-slate-700 hover:border-emerald-400'
+        }`}
+      >
+        {isAllAgreed ? <CheckSquare className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" /> : <Square className="mt-0.5 h-5 w-5 shrink-0 text-slate-500" />}
+        <span className="text-sm font-bold">我已詳讀並同意配合以上事項 (閱讀後，請勾選)</span>
+      </button>
+
       {!isAllAgreed ? (
         <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center space-x-2.5">
           <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-          <span>您需勾選同意以上全部 5 項申請聲明，方能成功提交廢棄傢俱清運申請。</span>
+          <span>閱讀後請勾選同意以上全部 5 項申請聲明，方能提交申請。</span>
         </div>
       ) : (
         <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center space-x-2.5">
           <ShieldCheck className="w-4 h-4 flex-shrink-0 text-emerald-400" />
-          <span>您已同意所有申請聲明事項，符合環保清運服務申請條件。</span>
+          <span>您已詳讀並同意配合所有申請聲明事項。</span>
         </div>
       )}
     </div>

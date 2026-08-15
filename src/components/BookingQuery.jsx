@@ -21,16 +21,6 @@ export default function BookingQuery({ bookings, onOpenTagModal, onCancelBooking
     setSearched(true);
   };
 
-  const handleQuickSearchDemo = (phoneOrId) => {
-    setSearchQuery(phoneOrId);
-    const filtered = bookings.filter((b) =>
-      b.id.toLowerCase().includes(phoneOrId.toLowerCase()) ||
-      b.phone.replaceAll('-', '').includes(phoneOrId.replaceAll('-', ''))
-    );
-    setResults(filtered);
-    setSearched(true);
-  };
-
   const getStatusBadge = (status) => {
     switch (status) {
       case '已收件':
@@ -70,7 +60,7 @@ export default function BookingQuery({ bookings, onOpenTagModal, onCancelBooking
             <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="請輸入手機號碼 (例如: 0912-345-678) 或單號 (例如: FUR-...)"
+              placeholder="請輸入手機號碼 (例如: 0912-345-678) 或單號 (例如: 115-0815-001)"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-12 pr-4 py-3 bg-slate-900/90 border border-slate-700 rounded-2xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500"
@@ -85,19 +75,7 @@ export default function BookingQuery({ bookings, onOpenTagModal, onCancelBooking
           </button>
         </form>
 
-        {/* Demo buttons */}
-        <div className="pt-2 flex flex-wrap items-center gap-2 text-xs">
-          <span className="text-slate-400 font-semibold">快捷測試點擊查詢:</span>
-          {bookings.slice(0, 3).map((b) => (
-            <button
-              key={b.id}
-              onClick={() => handleQuickSearchDemo(b.phone)}
-              className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 transition-all"
-            >
-              {b.applicantName} ({b.phone})
-            </button>
-          ))}
-        </div>
+        <p className="text-[11px] text-slate-400">為保護個人資料，查詢資料不提供公開快捷按鈕；請自行輸入電話或預約單號。</p>
       </div>
 
       {/* Results Area */}

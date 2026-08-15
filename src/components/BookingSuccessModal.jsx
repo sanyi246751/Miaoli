@@ -37,7 +37,7 @@ export default function BookingSuccessModal({ booking, onOpenTagModal, onGoToQue
           </div>
 
           {/* Key Summary list */}
-          <div className="space-y-3 bg-slate-950/60 p-4 rounded-2xl border border-slate-800 text-xs">
+          <div className="success-summary space-y-3 bg-slate-950/60 p-4 rounded-2xl border border-slate-800 text-xs text-white">
             <div className="flex items-center justify-between border-b border-slate-800 pb-2">
               <span className="text-slate-400 font-semibold flex items-center">
                 <Calendar className="w-3.5 h-3.5 mr-1 text-emerald-400" />

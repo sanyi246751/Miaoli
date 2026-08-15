@@ -196,10 +196,10 @@ export default function AdminDashboard({ bookings, setBookings, onOpenTagModal }
       </div>
 
       {/* Bookings Data Table */}
-      <div className="glass-card rounded-2xl border border-slate-700/80 shadow-2xl overflow-hidden">
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 shadow-lg shadow-slate-300/20 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-800/90 text-slate-300 border-b border-slate-700 uppercase tracking-wider font-bold">
+            <thead className="bg-emerald-50/70 text-slate-600 border-b border-slate-200 uppercase tracking-wider font-bold">
               <tr>
                 <th className="py-3.5 px-4">預約單號 / 時間</th>
                 <th className="py-3.5 px-4">申請人與電話</th>
@@ -210,7 +210,7 @@ export default function AdminDashboard({ bookings, setBookings, onOpenTagModal }
                 <th className="py-3.5 px-4 text-right">操作與審核</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800 text-slate-200">
+            <tbody className="divide-y divide-slate-200 text-slate-700">
               {filteredBookings.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-12 text-center text-slate-500">
@@ -219,7 +219,7 @@ export default function AdminDashboard({ bookings, setBookings, onOpenTagModal }
                 </tr>
               ) : (
                 filteredBookings.map((b) => (
-                  <tr key={b.id} className="hover:bg-slate-800/40 transition-colors">
+                  <tr key={b.id} className="odd:bg-white even:bg-slate-50 hover:bg-emerald-50 transition-colors">
                     <td className="py-3.5 px-4 font-mono font-bold text-emerald-400">
                       <div>{b.id}</div>
                       <span className="text-[10px] text-slate-500 font-sans font-normal">{b.createdAt}</span>

@@ -1,76 +1,57 @@
 import React from 'react';
-import { Truck, FileText, Search, ShieldCheck, Leaf, Clock } from 'lucide-react';
+import { Truck, FileText, Search, ShieldCheck, Leaf } from 'lucide-react';
+
+const PUBLIC_NAV_ITEMS = [
+  { id: 'booking', label: '線上預約', icon: FileText },
+  { id: 'query', label: '進度查詢', icon: Search },
+];
 
 export default function Header({ activeTab, setActiveTab, pendingCount }) {
+  const navClass = (id) =>
+    'relative flex min-h-10 items-center gap-2 rounded-xl px-3 text-sm font-bold transition-all sm:px-4 ' +
+    (activeTab === id
+      ? 'bg-emerald-700 text-white shadow-md shadow-emerald-900/10'
+      : 'text-slate-600 hover:bg-emerald-50 hover:text-emerald-800');
+
   return (
-    <header className="sticky top-0 z-40 bg-slate-900/90 backdrop-blur-md border-b border-emerald-500/20 text-slate-100 shadow-xl">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col md:flex-row items-center justify-between py-4 gap-4">
-          
-          {/* Logo & Portal Title */}
-          <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setActiveTab('booking')}>
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20 ring-2 ring-emerald-400/30">
-              <Truck className="w-7 h-7 text-slate-950 stroke-[2.5]" />
+    <header className="sticky top-0 z-40 border-b border-emerald-900/10 bg-white/90 text-slate-800 shadow-[0_8px_30px_-24px_rgba(6,78,59,.45)] backdrop-blur-xl no-print">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="flex min-h-20 items-center justify-between gap-3 py-3">
+          <button className="group flex min-w-0 items-center gap-3 text-left" onClick={() => setActiveTab('booking')} aria-label="回到線上預約首頁">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-700 text-white shadow-lg shadow-emerald-800/20 transition-transform group-hover:-translate-y-0.5">
+              <Truck className="h-6 w-6 stroke-[2.5]" />
             </div>
-            <div>
-              <div className="flex items-center space-x-2">
-                <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-emerald-300 via-teal-200 to-emerald-100">
-                  大型廢棄傢俱預約清運系統
-                </h1>
-                <span className="hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  <Leaf className="w-3 h-3 mr-1" /> 家戶免費專案
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h1 className="truncate text-base font-black tracking-tight text-emerald-950 sm:text-xl">大型傢俱清運</h1>
+                <span className="hidden items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700 lg:inline-flex">
+                  <Leaf className="mr-1 h-3 w-3" /> 家戶免費
                 </span>
               </div>
-              <p className="text-xs text-slate-400 font-medium mt-0.5">
-                線上預約廢棄傢俱清運 ‧ 迅速排班 ‧ 環保永續
-              </p>
+              <p className="mt-0.5 hidden text-xs font-medium text-slate-400 sm:block">市民線上申請與清運進度服務</p>
             </div>
-          </div>
+          </button>
 
-          {/* Navigation Tabs */}
-          <nav className="flex items-center bg-slate-800/80 p-1.5 rounded-xl border border-slate-700/60 shadow-inner">
-            <button
-              onClick={() => setActiveTab('booking')}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
-                activeTab === 'booking'
-                  ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 shadow-md shadow-emerald-500/20'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
-              }`}
-            >
-              <FileText className="w-4 h-4" />
-              <span>線上預約申請</span>
-            </button>
+          <nav className="flex shrink-0 items-center gap-2" aria-label="主要功能">
+            <div className="flex items-center gap-1 rounded-2xl border border-slate-200 bg-slate-50 p-1" aria-label="市民服務">
+              {PUBLIC_NAV_ITEMS.map(({ id, label, icon: Icon }) => (
+                <button key={id} onClick={() => setActiveTab(id)} aria-current={activeTab === id ? 'page' : undefined} className={navClass(id)}>
+                  <Icon className="h-4 w-4" />
+                  <span className="hidden sm:inline">{label}</span>
+                </button>
+              ))}
+            </div>
 
-            <button
-              onClick={() => setActiveTab('query')}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
-                activeTab === 'query'
-                  ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 shadow-md shadow-emerald-500/20'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
-              }`}
-            >
-              <Search className="w-4 h-4" />
-              <span>預約進度查詢</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('admin')}
-              className={`relative flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
-                activeTab === 'admin'
-                  ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 shadow-md shadow-emerald-500/20'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
-              }`}
-            >
-              <ShieldCheck className="w-4 h-4" />
-              <span>清潔隊後台</span>
-              {pendingCount > 0 && (
-                <span className="ml-1 bg-amber-500 text-slate-950 text-xs font-bold px-1.5 py-0.5 rounded-full animate-pulse">
-                  {pendingCount}
-                </span>
-              )}
-            </button>
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-1" aria-label="管理功能">
+              <button onClick={() => setActiveTab('admin')} aria-current={activeTab === 'admin' ? 'page' : undefined} className={navClass('admin')}>
+                <ShieldCheck className="h-4 w-4" />
+                <span className="hidden sm:inline">清潔隊後台</span>
+                {pendingCount > 0 && (
+                  <span className="absolute -right-1.5 -top-1.5 min-w-5 rounded-full bg-amber-400 px-1.5 py-0.5 text-center text-[10px] font-black leading-4 text-amber-950 ring-2 ring-white">{pendingCount}</span>
+                )}
+              </button>
+            </div>
           </nav>
-
         </div>
       </div>
     </header>

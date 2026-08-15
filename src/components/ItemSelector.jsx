@@ -82,20 +82,21 @@ export default function ItemSelector({ selectedItems, setSelectedItems }) {
               key={cat.id}
               className={`relative rounded-xl p-4 transition-all duration-200 border ${
                 isSelected
-                  ? 'bg-gradient-to-b from-slate-800 to-slate-850 border-emerald-500/50 shadow-lg shadow-emerald-950/40 ring-1 ring-emerald-500/30'
-                  : 'bg-slate-800/40 border-slate-700/60 hover:border-slate-600 hover:bg-slate-800/70'
+                  ? 'bg-emerald-950 border-emerald-300 shadow-lg shadow-emerald-950/40 ring-2 ring-emerald-400'
+                  : 'bg-slate-900 border-slate-600 hover:border-slate-400 hover:bg-slate-800'
               }`}
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-center space-x-3">
-                  <span className="text-3xl p-2 rounded-xl bg-slate-900/60 border border-slate-700/50 shadow-inner">
+                  <span className={`text-3xl p-2 rounded-xl border shadow-inner ${isSelected ? 'bg-white border-white/60' : 'bg-slate-900/60 border-slate-700/50'}`}>
                     {cat.icon}
                   </span>
                   <div>
-                    <h4 className="font-bold text-slate-100 text-base">{cat.name}</h4>
-                    <p className="text-xs text-slate-400 mt-0.5">{cat.desc}</p>
+                    <h4 className={`font-black text-base ${isSelected ? '!text-white' : 'text-slate-100'}`}>{cat.name}</h4>
+                    <p className={`text-xs mt-0.5 ${isSelected ? '!text-emerald-100' : 'text-slate-400'}`}>{cat.desc}</p>
                   </div>
                 </div>
+                <span className={`ml-2 shrink-0 rounded-full px-2.5 py-1 text-[11px] font-black ${isSelected ? 'bg-emerald-400 text-emerald-950' : 'bg-slate-700 text-slate-200'}`}>{isSelected ? '✓ 已選取' : '未選取'}</span>
               </div>
 
               {/* Quantity Controls */}
@@ -138,7 +139,7 @@ export default function ItemSelector({ selectedItems, setSelectedItems }) {
                 <div className="mt-3 animate-fadeIn">
                   <input
                     type="text"
-                    placeholder={`填寫規格/細節 (例: ${cat.name === '床墊' ? '雙人獨立筒床墊' : cat.name === '櫃子' ? '三門大衣櫃' : '特定尺寸或樣式說明'})`}
+                    placeholder={cat.id === 'other' ? '請填寫其他清運項目內容' : `填寫規格/細節 (例: ${cat.name === '床墊' ? '雙人獨立筒床墊' : cat.name === '櫃子' ? '三門大衣櫃' : '特定尺寸或樣式說明'})`}
                     value={getItemNote(cat.id)}
                     onChange={(e) => handleNoteChange(cat.id, e.target.value)}
                     className="w-full text-xs bg-slate-900/90 border border-slate-700/80 rounded-lg px-3 py-1.5 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500"

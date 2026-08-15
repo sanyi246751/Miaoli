@@ -46,11 +46,11 @@ export default function PrintableTagModal({ booking, onClose }) {
         <div className="p-6 overflow-y-auto max-h-[80vh]">
           <div
             id="printable-tag"
-            className="bg-white text-slate-900 rounded-xl p-6 border-4 border-dashed border-slate-800 shadow-lg relative font-sans"
+            className="bg-white text-slate-900 text-center rounded-xl p-6 border-4 border-dashed border-slate-800 shadow-lg relative font-sans mx-auto"
           >
             {/* Tag Header */}
-            <div className="border-b-2 border-slate-800 pb-4 mb-4 flex items-center justify-between">
-              <div>
+            <div className="border-b-2 border-slate-800 pb-4 mb-4 flex flex-col items-center gap-3">
+              <div className="text-center">
                 <div className="flex items-center space-x-2">
                   <span className="bg-emerald-700 text-white text-xs font-bold px-2 py-0.5 rounded">
                     家戶免費專案
