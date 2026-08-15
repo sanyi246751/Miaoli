@@ -25,6 +25,7 @@ dist-ssr
 
 # 敏感資訊檔案
 google_apps_script.gs
+close/
 .env
 .env.*
 .env.local
