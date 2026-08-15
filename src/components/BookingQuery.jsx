@@ -1,10 +1,18 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Search, Phone, FileText, Calendar, MapPin, Printer, CheckCircle, Clock, TruckCheck, AlertCircle, XCircle } from 'lucide-react';
 
 export default function BookingQuery({ bookings, onOpenTagModal, onCancelBooking }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searched, setSearched] = useState(false);
   const [results, setResults] = useState([]);
+
+  useEffect(() => {
+    const bookingId = new URLSearchParams(window.location.search).get('booking');
+    if (!bookingId || bookings.length === 0) return;
+    setSearchQuery(bookingId);
+    setResults(bookings.filter((booking) => String(booking.id) === bookingId));
+    setSearched(true);
+  }, [bookings]);
 
   const handleSearch = (e) => {
     e.preventDefault();

@@ -29,6 +29,11 @@ export default function App() {
     localStorage.setItem('bulky_furniture_bookings', JSON.stringify(bookings));
   }, [bookings]);
 
+  useEffect(() => {
+    const bookingId = new URLSearchParams(window.location.search).get('booking');
+    if (bookingId) setActiveTab('query');
+  }, []);
+
   // Modal states
   const [recentlyCreatedBooking, setRecentlyCreatedBooking] = useState(null);
   const [printableBooking, setPrintableBooking] = useState(null);

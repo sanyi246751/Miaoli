@@ -67,7 +67,7 @@ export default function PrintableTagModal({ booking, onClose }) {
               {/* QR Code */}
               <div className="text-center bg-slate-100 p-2 rounded-lg border border-slate-300">
                 <QRCodeSVG
-                  value={`https://clean-city.gov.tw/booking/${booking.id}`}
+                  value={`${window.location.origin}${window.location.pathname}?booking=${encodeURIComponent(booking.id)}`}
                   size={76}
                   level="H"
                 />
