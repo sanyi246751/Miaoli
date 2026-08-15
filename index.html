@@ -331,8 +331,8 @@
       const [activeTab, setActiveTab] = useState('booking'); // 'booking', 'query', 'admin'
       
       // GAS Web App URL state pre-configured with user's endpoint
-      const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbw2fzd48VzT4IJgeFORnlid9VPOoHggihOBpqTc32ZdfwaAESUZrk_gRiMxnieQsxPq3g/exec';
-      const [gasUrl, setGasUrl] = useState(() => localStorage.getItem('gas_web_app_url') || DEFAULT_GAS_URL);
+      const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwYPD1R7pq3boSvrZUcVYLHT9CARhtDLJjVDOcPF8zZO9dbIFWQZJmmN56KFE9ok__SkQ/exec';
+      const [gasUrl, setGasUrl] = useState(() => { localStorage.setItem('gas_web_app_url', DEFAULT_GAS_URL); return DEFAULT_GAS_URL; });
       const [showGasModal, setShowGasModal] = useState(false);
       const [isSyncingGas, setIsSyncingGas] = useState(false);
       const [syncMessage, setSyncMessage] = useState('');
