@@ -1,11 +1,99 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { CITY_DISTRICTS } from '../data/mockData';
 import { ShieldCheck, Truck, CheckCircle2, Clock, Filter, Search, Download, RotateCcw, Eye, ArrowUpRight, AlertCircle, FileSpreadsheet } from 'lucide-react';
 
 export default function AdminDashboard({ bookings, setBookings, onOpenTagModal }) {
+  const DISPATCH_ORIGIN = '24.38098913508549,120.73429901439242';
   const [selectedDistrict, setSelectedDistrict] = useState('全部');
   const [selectedStatus, setSelectedStatus] = useState('全部');
   const [searchKey, setSearchKey] = useState('');
+  const [vehicleSelections, setVehicleSelections] = useState({});
+  const [tripSelections, setTripSelections] = useState({});
+  const [routeEditor, setRouteEditor] = useState(null);
+  const [routeCalculations, setRouteCalculations] = useState(() => { try { return JSON.parse(localStorage.getItem('recycling_route_calculations') || '{}'); } catch { return {}; } });
+  const [customRoutes, setCustomRoutes] = useState(() => { try { return JSON.parse(localStorage.getItem('recycling_custom_routes') || '{}'); } catch { return {}; } });
+  const getDispatchPeriod = (booking) => String(booking.preferredTimeSlot || '未指定時段').trim().split(/\s+/)[0];
+  const getDispatchTrip = (booking) => Number(booking.dispatchTrip || 1);
+  const getRouteKey = (booking) => `${booking.preferredDate}|${booking.assignedVehicle}|${getDispatchPeriod(booking)}|${getDispatchTrip(booking)}`;
+
+  const buildRouteUrl = (orderedBookings) => {
+    const stops = orderedBookings.map((item) => item.mapAddress || item.address).filter(Boolean);
+    const destination = stops[stops.length - 1];
+    const waypoints = stops.slice(0, -1);
+    return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(DISPATCH_ORIGIN)}&destination=${encodeURIComponent(destination)}${waypoints.length ? `&waypoints=${encodeURIComponent(waypoints.join('|'))}` : ''}&travelmode=driving`;
+  };
+
+  const getCoordinates = (item) => {
+    if (Number.isFinite(Number(item.latitude)) && Number.isFinite(Number(item.longitude))) return [Number(item.latitude), Number(item.longitude)];
+    const match = String(item.mapLink || '').match(/(?:@|query=)(-?\d+\.\d+)[,%2C]+\s*(-?\d+\.\d+)/i);
+    return match ? [Number(match[1]), Number(match[2])] : null;
+  };
+
+  const getRecommendedOrder = (items) => {
+    if (!items.every(getCoordinates)) return [...items].sort((a, b) => `${a.district || ''}${a.address || ''}`.localeCompare(`${b.district || ''}${b.address || ''}`, 'zh-Hant'));
+    const remaining = [...items];
+    const ordered = [];
+    let current = DISPATCH_ORIGIN.split(',').map(Number);
+    while (remaining.length) {
+      remaining.sort((a, b) => {
+        const ca = getCoordinates(a); const cb = getCoordinates(b);
+        return Math.hypot(ca[0] - current[0], ca[1] - current[1]) - Math.hypot(cb[0] - current[0], cb[1] - current[1]);
+      });
+      const next = remaining.shift(); ordered.push(next); current = getCoordinates(next);
+    }
+    return ordered;
+  };
+  const estimateRouteKm = (items) => {
+    if (!items.length || !items.every(getCoordinates)) return '';
+    const points = [DISPATCH_ORIGIN.split(',').map(Number), ...items.map(getCoordinates)];
+    const radians = (value) => value * Math.PI / 180;
+    const straightKm = points.slice(1).reduce((sum, point, index) => { const prev = points[index]; const dLat = radians(point[0] - prev[0]); const dLng = radians(point[1] - prev[1]); const a = Math.sin(dLat / 2) ** 2 + Math.cos(radians(prev[0])) * Math.cos(radians(point[0])) * Math.sin(dLng / 2) ** 2; return sum + 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)); }, 0);
+    return (straightKm * 1.25).toFixed(1);
+  };
+  const getRouteCarbon = (booking) => {
+    const calculation = routeCalculations[getRouteKey(booking)];
+    if (calculation?.status === 'calculating') return '路程計算中…';
+    if (calculation?.distanceKm) return `${calculation.distanceKm.toFixed(1)} km／${calculation.carbonKg.toFixed(2)} kg CO₂e`;
+    return calculation?.error || '路程待計算';
+  };
+  const getCustomRouteCarbon = (booking) => { const value = customRoutes[getRouteKey(booking)]?.calculation; if (value?.status === 'calculating') return '計算中…'; return value?.distanceKm ? `${Number(value.distanceKm).toFixed(1)} km／${Number(value.carbonKg).toFixed(2)} kg CO₂e` : '尚未自訂'; };
+
+  const getRouteBookings = (booking) => bookings.filter((item) =>
+    item.preferredDate === booking.preferredDate &&
+    item.assignedVehicle === booking.assignedVehicle &&
+    getDispatchPeriod(item) === getDispatchPeriod(booking) &&
+    getDispatchTrip(item) === getDispatchTrip(booking) &&
+    item.status === '已排班'
+  );
+
+  const getSuggestedRouteUrl = (booking) => {
+    const routeBookings = booking.assignedVehicle ? getRouteBookings(booking) : [booking];
+    const recommendedOrder = getRecommendedOrder(routeBookings);
+    return buildRouteUrl(recommendedOrder);
+  };
+
+  useEffect(() => {
+    const groups = new Map();
+    bookings.filter((item) => item.status === '已排班' && item.assignedVehicle).forEach((item) => { const key = getRouteKey(item); groups.set(key, [...(groups.get(key) || []), item]); });
+    groups.forEach((items, key) => {
+      const signature = items.map((item) => `${item.id}:${item.address}`).sort().join('|');
+      if ((routeCalculations[key]?.signature === signature && routeCalculations[key]?.status === 'done') || routeCalculations[key]?.status === 'calculating') return;
+      setRouteCalculations((current) => ({ ...current, [key]: { status: 'calculating', signature } }));
+      (async () => {
+        try {
+          const gasUrl = localStorage.getItem('gas_web_app_url'); if (!gasUrl) throw new Error('尚未設定 GAS Web App');
+          const addresses = getRecommendedOrder(items).map((item) => `${item.district || ''}${item.address || ''}`); const response = await fetch(`${gasUrl}?action=calculateRoute&optimize=true&addresses=${encodeURIComponent(JSON.stringify(addresses))}`); const result = await response.json();
+          if (result.status !== 'success') throw new Error(result.message || '無法取得 Google 行車路線');
+          const value = { status: 'done', signature, distanceKm: Number(result.distanceKm), carbonKg: Number(result.carbonKg), durationMinutes: Number(result.durationMinutes) };
+          setRouteCalculations((current) => { const next = { ...current, [key]: value }; localStorage.setItem('recycling_route_calculations', JSON.stringify(next)); return next; });
+        } catch (error) { setRouteCalculations((current) => ({ ...current, [key]: { status: 'error', signature, error: error.message || '路程計算失敗' } })); }
+      })();
+    });
+  }, [bookings]);
+
+  const calculateCustomRoute = async (booking, stops) => { const key = getRouteKey(booking); const calculation = { status: 'calculating' }; setCustomRoutes((current) => ({ ...current, [key]: { stopIds: stops.map((item) => item.id), calculation } })); try { const gasUrl = localStorage.getItem('gas_web_app_url'); if (!gasUrl) throw new Error('尚未設定 GAS Web App'); const addresses = stops.map((item) => `${item.district || ''}${item.address || ''}`); const response = await fetch(`${gasUrl}?action=calculateRoute&optimize=false&addresses=${encodeURIComponent(JSON.stringify(addresses))}`); const result = await response.json(); if (result.status !== 'success') throw new Error(result.message); const entry = { stopIds: stops.map((item) => item.id), calculation: { status: 'done', distanceKm: result.distanceKm, carbonKg: result.carbonKg, durationMinutes: result.durationMinutes } }; setCustomRoutes((current) => { const next = { ...current, [key]: entry }; localStorage.setItem('recycling_custom_routes', JSON.stringify(next)); return next; }); setRouteEditor((current) => current ? { ...current, distanceKm: Number(result.distanceKm).toFixed(1), fuelEfficiency: '5' } : current); } catch (error) { setCustomRoutes((current) => ({ ...current, [key]: { stopIds: stops.map((item) => item.id), calculation: { status: 'error', error: error.message } } })); } };
+  const openRouteEditor = (booking) => { const available = getRouteBookings(booking); const saved = customRoutes[getRouteKey(booking)]; const stops = saved?.stopIds ? saved.stopIds.map((id) => available.find((item) => item.id === id)).filter(Boolean).concat(available.filter((item) => !saved.stopIds.includes(item.id))) : getRecommendedOrder(available); setRouteEditor({ booking, stops, distanceKm: saved?.calculation?.distanceKm ? Number(saved.calculation.distanceKm).toFixed(1) : '', fuelEfficiency: '5' }); if (!saved?.calculation?.distanceKm) calculateCustomRoute(booking, stops); };
+  const moveRouteStop = (index, direction) => { if (!routeEditor) return; const nextIndex = index + direction; if (nextIndex < 0 || nextIndex >= routeEditor.stops.length) return; const stops = [...routeEditor.stops]; [stops[index], stops[nextIndex]] = [stops[nextIndex], stops[index]]; setRouteEditor({ ...routeEditor, stops, distanceKm: '' }); calculateCustomRoute(routeEditor.booking, stops); };
 
   // Status Filter
   const filteredBookings = bookings.filter((b) => {
@@ -45,9 +133,41 @@ export default function AdminDashboard({ bookings, setBookings, onOpenTagModal }
     );
   };
 
+  const handleSchedule = (booking) => {
+    const vehicle = vehicleSelections[booking.id] || booking.assignedVehicle;
+    const dispatchTrip = Number(tripSelections[booking.id] || booking.dispatchTrip || 1);
+    if (!vehicle) return;
+    const nowTime = new Date().toLocaleString();
+    setBookings((prev) => prev.map((b) => b.id === booking.id ? {
+      ...b,
+      status: '已排班',
+      assignedVehicle: vehicle,
+      dispatchTrip,
+      dispatchOrigin: DISPATCH_ORIGIN,
+      suggestedRouteUrl: getSuggestedRouteUrl(b),
+      statusTimeline: [...(b.statusTimeline || []), {
+        status: '已排班',
+        time: nowTime,
+        note: `已指派資源回收車 ${vehicle} 車・${getDispatchPeriod(booking)}第 ${dispatchTrip} 趟`
+      }]
+    } : b));
+  };
+
+  const handleStatusChange = (booking, newStatus) => {
+    if (newStatus === '已排班') {
+      if (!(vehicleSelections[booking.id] || booking.assignedVehicle)) {
+        window.alert('請先選擇 A 車或 B 車，再將狀態改為已排班。');
+        return;
+      }
+      handleSchedule(booking);
+      return;
+    }
+    handleUpdateStatus(booking.id, newStatus, `後台手動變更狀態為${newStatus}`);
+  };
+
   // Export CSV
   const handleExportCSV = () => {
-    const headers = ['預約單號', '申請人', '電話', '行政區', '詳細地址', '清運日期', '清運品項與數量', '狀態'];
+    const headers = ['預約單號', '申請人', '電話', '行政區', '詳細地址', '清運日期', '清運品項與數量', '車輛', '狀態'];
     const rows = filteredBookings.map((b) => [
       b.id,
       b.applicantName,
@@ -56,6 +176,7 @@ export default function AdminDashboard({ bookings, setBookings, onOpenTagModal }
       `"${b.address}"`,
       b.preferredDate,
       `"${b.items.map((i) => `${i.name}x${i.quantity}`).join('; ')}"`,
+      b.assignedVehicle || '',
       b.status
     ]);
 
@@ -248,7 +369,7 @@ export default function AdminDashboard({ bookings, setBookings, onOpenTagModal }
                       </div>
                     </td>
                     <td className="py-3.5 px-4 font-bold">
-                      <span className={`px-2.5 py-1 rounded-full text-[11px] ${
+                      <select value={b.status} onChange={(e) => handleStatusChange(b, e.target.value)} className={`rounded-lg border px-2 py-1 text-[11px] font-bold ${
                         b.status === '已排班'
                           ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
                           : b.status === '清運完成'
@@ -256,9 +377,13 @@ export default function AdminDashboard({ bookings, setBookings, onOpenTagModal }
                           : b.status === '已取消'
                           ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
                           : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
-                      }`}>
-                        {b.status}
-                      </span>
+                      }`} aria-label={`修改 ${b.id} 狀態`}>
+                        <option value="已收件">已收件</option>
+                        <option value="待審核">待審核</option>
+                        <option value="已排班">已排班</option>
+                        <option value="清運完成">清運完成</option>
+                        <option value="已取消">已取消</option>
+                      </select>
                     </td>
                     <td className="py-3.5 px-4 text-right">
                       <div className="flex items-center justify-end space-x-2">
@@ -270,22 +395,29 @@ export default function AdminDashboard({ bookings, setBookings, onOpenTagModal }
                           <Eye className="w-4 h-4" />
                         </button>
 
-                        {(b.status === '已收件' || b.status === '待審核') && (
-                          <button
-                            onClick={() => handleUpdateStatus(b.id, '已排班', '已核對項目，指派環保二中隊專車')}
-                            className="px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500 text-emerald-300 hover:text-slate-950 font-bold transition-all"
-                          >
-                            核可排班
-                          </button>
+                        {b.status !== '清運完成' && (
+                          <div className="flex items-center gap-1.5">
+                            <select value={vehicleSelections[b.id] || b.assignedVehicle || ''} onChange={(e) => setVehicleSelections((prev) => ({ ...prev, [b.id]: e.target.value }))} className="rounded-lg border border-slate-600 bg-slate-800 px-2 py-1 text-xs font-bold text-slate-200" aria-label={`選擇 ${b.id} 的資源回收車`}>
+                              <option value="">先選車輛</option>
+                              <option value="A">A 車</option>
+                              <option value="B">B 車</option>
+                            </select>
+                            <select value={tripSelections[b.id] || b.dispatchTrip || 1} onChange={(e) => setTripSelections((prev) => ({ ...prev, [b.id]: Number(e.target.value) }))} className="rounded-lg border border-slate-600 bg-slate-800 px-2 py-1 text-xs font-bold text-slate-200" aria-label={`選擇 ${b.id} 的發車趟次`}>
+                              {[1, 2, 3, 4].map((trip) => <option key={trip} value={trip}>第 {trip} 趟</option>)}
+                            </select>
+                            {(b.status === '已收件' || b.status === '待審核' || b.status === '已取消') && <button onClick={() => handleSchedule(b)} disabled={!(vehicleSelections[b.id] || b.assignedVehicle)} className="px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500 text-emerald-300 hover:text-slate-950 font-bold transition-all disabled:cursor-not-allowed disabled:opacity-40">核可排班</button>}
+                          </div>
                         )}
 
                         {b.status === '已排班' && (
-                          <button
-                            onClick={() => handleUpdateStatus(b.id, '清運完成', '隊員已於現場載運完畢')}
-                            className="px-2.5 py-1 rounded-lg bg-blue-500/20 hover:bg-blue-500 text-blue-300 hover:text-slate-950 font-bold transition-all"
-                          >
-                            結案完成
-                          </button>
+                          <>
+                            <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap">
+                              <a href={getSuggestedRouteUrl(b)} target="_blank" rel="noopener noreferrer" className="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 hover:bg-amber-500 hover:text-slate-950 font-bold">📍 {b.assignedVehicle ? `${b.assignedVehicle} 車${getDispatchPeriod(b)}第 ${getDispatchTrip(b)} 趟路線（${getRouteBookings(b).length} 點）` : '建議路線'}</a>
+                              <span className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-xs font-black text-emerald-300">{getRouteCarbon(b)}</span>
+                              {getRouteBookings(b).length > 1 && <><button onClick={() => openRouteEditor(b)} className="px-2.5 py-1 rounded-lg bg-violet-500/20 text-violet-300 hover:bg-violet-500 hover:text-white font-bold">↕ 自訂路線</button><span className="rounded-lg border border-violet-500/30 bg-violet-500/10 px-2.5 py-1 text-xs font-black text-violet-300">{getCustomRouteCarbon(b)}</span></>}
+                            </span>
+                            <button onClick={() => handleUpdateStatus(b.id, '清運完成', '隊員已於現場載運完畢')} className="px-2.5 py-1 rounded-lg bg-blue-500/20 hover:bg-blue-500 text-blue-300 hover:text-slate-950 font-bold transition-all">結案完成</button>
+                          </>
                         )}
                       </div>
                     </td>
@@ -296,6 +428,19 @@ export default function AdminDashboard({ bookings, setBookings, onOpenTagModal }
           </table>
         </div>
       </div>
+
+      {routeEditor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4">
+          <div className="w-full max-w-2xl rounded-2xl border border-slate-700 bg-slate-900 p-6 text-left shadow-2xl">
+            <div className="mb-4 flex items-start justify-between"><div><h3 className="text-lg font-black text-white">自訂 {routeEditor.booking.assignedVehicle} 車{getDispatchPeriod(routeEditor.booking)}第 {getDispatchTrip(routeEditor.booking)} 趟路線</h3><p className="text-xs text-slate-400">{routeEditor.booking.preferredDate}・起點固定為出車地址</p></div><button onClick={() => setRouteEditor(null)} className="text-slate-400">✕</button></div>
+            <div className="max-h-[55vh] space-y-2 overflow-y-auto">
+              {routeEditor.stops.map((stop, index) => <div key={stop.id} className="flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-800 p-3"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 font-black text-slate-950">{index + 1}</span><div className="min-w-0 flex-1"><strong className="text-sm text-white">{stop.applicantName}</strong><p className="truncate text-xs text-slate-400">{stop.address}</p></div><button onClick={() => moveRouteStop(index, -1)} disabled={index === 0} className="rounded bg-slate-700 px-2 py-1 disabled:opacity-30">↑</button><button onClick={() => moveRouteStop(index, 1)} disabled={index === routeEditor.stops.length - 1} className="rounded bg-slate-700 px-2 py-1 disabled:opacity-30">↓</button></div>)}
+            </div>
+            <div className="mt-4 grid gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 sm:grid-cols-3"><label className="text-xs font-bold text-slate-300">路線公里數<input type="number" min="0" step="0.1" value={routeEditor.distanceKm} onChange={(e) => setRouteEditor((current) => ({ ...current, distanceKm: e.target.value }))} placeholder="輸入 Google Maps 里程" className="mt-1 w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-white" /></label><label className="text-xs font-bold text-slate-300">車輛油耗（km/L）<input type="number" min="0.1" step="0.1" value={routeEditor.fuelEfficiency} onChange={(e) => setRouteEditor((current) => ({ ...current, fuelEfficiency: e.target.value }))} className="mt-1 w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-white" /></label><div><span className="text-xs font-bold text-slate-300">預估碳排量</span><strong className="mt-1 block text-xl text-emerald-400">{routeEditor.distanceKm && routeEditor.fuelEfficiency ? ((Number(routeEditor.distanceKm) / Number(routeEditor.fuelEfficiency)) * 2.69).toFixed(2) : '--'} kg CO₂e</strong><span className="text-[10px] text-slate-400">柴油 2.69 kg CO₂e/L</span></div></div>
+            <div className="mt-5 flex justify-end gap-2"><button onClick={() => setRouteEditor(null)} className="rounded-xl bg-slate-700 px-4 py-2 text-sm font-bold text-white">取消</button><a href={buildRouteUrl(routeEditor.stops)} target="_blank" rel="noopener noreferrer" className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-black text-slate-950">開啟自訂導航</a></div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

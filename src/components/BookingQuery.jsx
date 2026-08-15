@@ -218,6 +218,9 @@ export default function BookingQuery({ bookings, onOpenTagModal, onCancelBooking
                           {item.note && (
                             <p className="text-slate-400 mt-0.5 text-[11px]">{item.note}</p>
                           )}
+                          {Number.isFinite(Number(item.distanceKm)) && Number.isFinite(Number(item.carbonKg)) && (
+                            <p className="mt-1 text-[11px] font-bold text-emerald-400">🚚 {item.vehicle ? `${item.vehicle} 車・` : ''}{item.routeType || '行車路線'}・{Number(item.distanceKm).toFixed(1)} km・{Number(item.carbonKg).toFixed(2)} kg CO₂e</p>
+                          )}
                         </div>
                       </div>
                     ))}
