@@ -217,6 +217,15 @@
       if (/^\d{2,3}\/\d{1,2}\/\d{1,2}$/.test(String(value || ''))) return value;
       return getMinguoTime(value).replace(/(上午|下午).*/, '');
     }
+
+    function formatTaiwanPhone(value) {
+      const digits = String(value || '').replace(/\D/g, '').slice(0, 10);
+      if (/^09\d{8}$/.test(digits)) return digits.slice(0, 4) + '-' + digits.slice(4);
+      if (/^037\d{6}$/.test(digits)) return digits.slice(0, 3) + '-' + digits.slice(3);
+      if (/^02\d{8}$/.test(digits)) return digits.slice(0, 2) + '-' + digits.slice(2);
+      if (/^0\d{8,9}$/.test(digits)) return digits.slice(0, 3) + '-' + digits.slice(3);
+      return value;
+    }
     
     function getMinguoCompactStr(d) {
       if (!d) d = new Date();
@@ -545,8 +554,8 @@
         const errs = {};
         if (!applicantName.trim()) errs.applicantName = '請輸入申請人姓名';
         if (!phone.trim()) errs.phone = '請輸入聯絡電話';
-        else if (!/^09\d{2}-?\d{3}-?\d{3}$/.test(phone.trim()) && !/^\d{8,10}$/.test(phone.trim())) {
-          errs.phone = '請輸入正確格式電話 (如: 0912-345-678)';
+        else if (!/^09\d{2}-?\d{6}$/.test(phone.trim()) && !/^0\d{1,2}-?\d{6,8}$/.test(phone.trim())) {
+          errs.phone = '請輸入正確格式電話（如 0912-345678 或 037-123456）';
         }
         if (!detailAddress.trim()) errs.detailAddress = '請填寫詳細清運地址';
         if (selectedItems.length === 0) errs.items = '請至少選擇一項待清運傢俱項目';
@@ -575,7 +584,7 @@
         const newBooking = {
           id: bookingId,
           applicantName,
-          phone,
+          phone: formatTaiwanPhone(phone),
           email,
           county,
           district,
@@ -860,9 +869,10 @@
                       </label>
                       <input
                         type="tel"
-                        placeholder="0912-345-678"
+                        placeholder="0912-345678 或 037-123456"
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
+                        onBlur={() => setPhone(formatTaiwanPhone(phone))}
                         className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-emerald-500"
                       />
                     </div>

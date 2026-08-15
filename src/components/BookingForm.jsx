@@ -5,6 +5,15 @@ import PhotoUploader from './PhotoUploader';
 import TermsConsent, { TERMS_LIST } from './TermsConsent';
 import { User, Phone, MapPin, Mail, Calendar, Clock, AlertCircle, ArrowRight, CheckCircle2, FileText, Sparkles } from 'lucide-react';
 
+const formatTaiwanPhone = (value) => {
+  const digits = String(value || '').replace(/\D/g, '').slice(0, 10);
+  if (/^09\d{8}$/.test(digits)) return `${digits.slice(0, 4)}-${digits.slice(4)}`;
+  if (/^037\d{6}$/.test(digits)) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  if (/^02\d{8}$/.test(digits)) return `${digits.slice(0, 2)}-${digits.slice(2)}`;
+  if (/^0\d{8,9}$/.test(digits)) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  return value;
+};
+
 export default function BookingForm({ onSubmitSuccess }) {
   // Form State
   const [applicantName, setApplicantName] = useState('');
@@ -42,7 +51,7 @@ export default function BookingForm({ onSubmitSuccess }) {
   // Quick fill sample data for fast evaluation
   const handleQuickFill = () => {
     setApplicantName('王小明');
-    setPhone('0912-345-678');
+    setPhone('0912-345678');
     setEmail('xiaoming.wang@example.com');
     setCounty('台北市');
     setDistrict('大安區');
@@ -70,8 +79,8 @@ export default function BookingForm({ onSubmitSuccess }) {
     }
     if (!phone.trim()) {
       newErrors.phone = '請填寫聯絡電話';
-    } else if (!/^09\d{2}-?\d{3}-?\d{3}$/.test(phone.trim()) && !/^\d{8,10}$/.test(phone.trim())) {
-      newErrors.phone = '請輸入有效的電話號碼 (如 0912-345-678)';
+    } else if (!/^09\d{2}-?\d{6}$/.test(phone.trim()) && !/^0\d{1,2}-?\d{6,8}$/.test(phone.trim())) {
+      newErrors.phone = '請輸入有效電話（如 0912-345678 或 037-123456）';
     }
 
     if (!detailAddress.trim()) {
@@ -121,7 +130,7 @@ export default function BookingForm({ onSubmitSuccess }) {
       const newBooking = {
         id: bookingId,
         applicantName,
-        phone,
+        phone: formatTaiwanPhone(phone),
         email,
         county,
         district,
@@ -241,9 +250,10 @@ export default function BookingForm({ onSubmitSuccess }) {
             </label>
             <input
               type="tel"
-              placeholder="請輸入電話 (例: 0912-345-678)"
+              placeholder="0912-345678 或 037-123456"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
+              onBlur={() => setPhone(formatTaiwanPhone(phone))}
               className={`w-full bg-slate-900/90 border rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none transition-all ${
                 errors.phone
                   ? 'border-rose-500 ring-1 ring-rose-500'
