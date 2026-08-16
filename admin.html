@@ -347,7 +347,13 @@
         return period + formatTime(match[1], match[2]) + '至' + formatTime(match[3], match[4]);
       };
       const getDispatchLabel = (booking, vehicle = booking.assignedVehicle, trip = getDispatchTrip(booking)) => vehicle ? vehicle + '車' + getDispatchTimeLabel(booking) + '第' + trip + '班' : '';
-      const getLocalAddress = (booking) => String(booking.address || '').replace(new RegExp('^(?:苗栗縣)?' + String(booking.district || '')), '').trim() || String(booking.address || '');
+      const getDistrictName = (booking) => String(booking.district || '').trim().replace(/^(?:苗栗縣)+/, '');
+      const getCountyDistrict = (booking) => '苗栗縣' + getDistrictName(booking);
+      const getLocalAddress = (booking) => {
+        const original = String(booking.address || '').trim();
+        const local = original.replace(/^(?:苗栗縣)+/, '').replace(new RegExp('^' + getDistrictName(booking)), '').trim();
+        return local || original;
+      };
       const saveVehicleCache = (next) => { setVehicles(next); localStorage.setItem('recycling_vehicles', JSON.stringify(next)); };
       
       // GAS Web App URL state pre-configured with user's endpoint
@@ -1489,7 +1495,7 @@
                                   <span className="mt-1 block font-mono text-xs text-slate-400">{b.phone}</span>
                                 </td>
                                 <td className="px-2 py-4 break-words leading-5 text-slate-300">
-                                  <span className="block font-black text-slate-700">{(b.county || '苗栗縣') + b.district}</span>
+                                  <span className="block font-black text-slate-700">{getCountyDistrict(b)}</span>
                                   {b.mapLink ? (
                                     <a href={b.mapLink} target="_blank" rel="noopener noreferrer" className="mt-1 block text-sky-700 underline decoration-sky-300 underline-offset-2 transition-colors hover:text-emerald-700" title="開啟 Google Maps">{getLocalAddress(b)}</a>
                                   ) : <span className="mt-1 block">{getLocalAddress(b)}</span>}
