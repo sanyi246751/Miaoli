@@ -326,6 +326,28 @@
       const getDispatchPeriod = (booking) => String(booking.preferredTimeSlot || '未指定時段').trim().split(/\s+/)[0];
       const getDispatchTrip = (booking) => Number(booking.dispatchTrip || 1);
       const getRouteKey = (booking) => booking.preferredDate + '|' + booking.assignedVehicle + '|' + getDispatchPeriod(booking) + '|' + getDispatchTrip(booking);
+      const getNextDispatchTrip = (booking, vehicle) => {
+        if (!vehicle) return 1;
+        const trips = bookings.filter((item) => item.id !== booking.id && item.status === '已排班' && item.preferredDate === booking.preferredDate && item.assignedVehicle === vehicle && getDispatchPeriod(item) === getDispatchPeriod(booking)).map(getDispatchTrip);
+        return trips.length ? Math.max(...trips) + 1 : 1;
+      };
+      const getDispatchChoices = (booking, vehicle) => {
+        if (!vehicle) return [];
+        const existingTrips = [...new Set(bookings.filter((item) => item.id !== booking.id && item.status === '已排班' && item.preferredDate === booking.preferredDate && item.assignedVehicle === vehicle && getDispatchPeriod(item) === getDispatchPeriod(booking)).map(getDispatchTrip))].sort((a, b) => a - b);
+        if (!existingTrips.length) return [{ trip: 1, mode: 'new' }];
+        const previousTrip = existingTrips[existingTrips.length - 1];
+        return [{ trip: previousTrip, mode: 'merge' }, { trip: previousTrip + 1, mode: 'new' }];
+      };
+      const getDispatchTimeLabel = (booking) => {
+        const raw = String(booking.preferredTimeSlot || '').trim();
+        const period = getDispatchPeriod(booking);
+        const match = raw.match(/(\d{1,2}):(\d{2})\s*[-~～至]\s*(\d{1,2}):(\d{2})/);
+        if (!match) return raw.replace(/\s+/g, '') || period;
+        const formatTime = (hour, minute) => Number(minute) === 0 ? Number(hour) + '點' : Number(hour) + '點' + minute + '分';
+        return period + formatTime(match[1], match[2]) + '至' + formatTime(match[3], match[4]);
+      };
+      const getDispatchLabel = (booking, vehicle = booking.assignedVehicle, trip = getDispatchTrip(booking)) => vehicle ? vehicle + '車' + getDispatchTimeLabel(booking) + '第' + trip + '班' : '';
+      const getLocalAddress = (booking) => String(booking.address || '').replace(new RegExp('^(?:苗栗縣)?' + String(booking.district || '')), '').trim() || String(booking.address || '');
       const saveVehicleCache = (next) => { setVehicles(next); localStorage.setItem('recycling_vehicles', JSON.stringify(next)); };
       
       // GAS Web App URL state pre-configured with user's endpoint
@@ -759,10 +781,10 @@
       const moveRouteStop = (index, direction) => { if (!routeEditor) return; const nextIndex = index + direction; if (nextIndex < 0 || nextIndex >= routeEditor.stops.length) return; const stops = [...routeEditor.stops]; [stops[index], stops[nextIndex]] = [stops[nextIndex], stops[index]]; setRouteEditor({ ...routeEditor, stops, distanceKm: '' }); calculateCustomRoute(routeEditor.booking, stops); };
 
       const handleScheduleBooking = (booking) => {
-        const vehicle = vehicleSelections[booking.id] || booking.assignedVehicle;
-        const dispatchTrip = Number(tripSelections[booking.id] || booking.dispatchTrip || 1);
+        const vehicle = vehicleSelections[booking.id] || (booking.status === '已取消' ? '' : booking.assignedVehicle);
+        const dispatchTrip = Number(tripSelections[booking.id] || getNextDispatchTrip(booking, vehicle));
         if (!vehicle) return;
-        const note = '已指派資源回收車 ' + vehicle + ' 車・' + getDispatchPeriod(booking) + '第 ' + dispatchTrip + ' 趟';
+        const note = '已排定 ' + getDispatchLabel(booking, vehicle, dispatchTrip);
         const nowTime = getMinguoTime();
         setBookings((prev) => prev.map((b) => b.id === booking.id ? {
           ...b,
@@ -781,7 +803,7 @@
 
       const handleAdminStatusChange = (booking, newStatus) => {
         if (newStatus === '已排班') {
-          if (!(vehicleSelections[booking.id] || booking.assignedVehicle)) {
+          if (!(vehicleSelections[booking.id] || (booking.status === '已取消' ? '' : booking.assignedVehicle))) {
             window.alert('請先選擇車號，再將狀態改為已排班。');
             return;
           }
@@ -1420,7 +1442,7 @@
                       <div className="flex flex-col gap-2 border-b border-slate-200 bg-emerald-50/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                           <h3 className="text-sm font-black text-slate-800">清運案件列表</h3>
-                          <p className="mt-0.5 text-xs text-slate-500">共 {bookings.length} 筆案件，左右滑動可查看完整欄位</p>
+                          <p className="mt-0.5 text-xs text-slate-500">共 {bookings.length} 筆案件，同一排班會集中排列並以框線標示</p>
                         </div>
                         <div className="flex items-center gap-3 text-[11px] font-bold">
                           <span className="flex items-center gap-1.5 text-amber-700"><i className="h-2 w-2 rounded-full bg-amber-300"></i>待處理</span>
@@ -1429,85 +1451,95 @@
                         </div>
                       </div>
 
-                      <div className="overflow-x-auto">
-                        <table className="w-full min-w-[1180px] table-fixed text-left text-sm">
+                      <div className="w-full overflow-hidden">
+                        <table className="w-full table-fixed text-left text-sm">
                           <thead className="border-b border-slate-200 bg-slate-100 text-xs font-bold tracking-wide text-slate-600">
                             <tr>
-                              <th className="w-[180px] px-4 py-3.5">案件單號／申請時間</th>
-                              <th className="w-[130px] px-4 py-3.5">申請人</th>
-                              <th className="w-[280px] px-4 py-3.5">清運地址</th>
-                              <th className="w-[120px] px-4 py-3.5">預約日期</th>
-                              <th className="w-[190px] px-4 py-3.5">清運品項</th>
-                              <th className="w-[100px] px-4 py-3.5">狀態</th>
-                              <th className="w-[220px] px-4 py-3.5 text-right">案件操作</th>
+                              <th className="w-[7%] px-2 py-3.5 text-center">標籤</th>
+                              <th className="w-[13%] px-2 py-3.5">案件單號／申請時間</th>
+                              <th className="w-[10%] px-2 py-3.5">申請人</th>
+                              <th className="w-[18%] px-2 py-3.5">清運地址</th>
+                              <th className="w-[10%] px-2 py-3.5">預約日期</th>
+                              <th className="w-[12%] px-2 py-3.5">清運品項</th>
+                              <th className="w-[17%] px-2 py-3.5">狀態／排班</th>
+                              <th className="w-[13%] px-2 py-3.5 text-right">案件操作</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-200 text-slate-700">
-                            {bookings.map((b, rowIndex) => (
-                              <tr key={b.id} className={(rowIndex % 2 === 0 ? 'bg-white ' : 'bg-slate-50 ') + 'align-top transition-colors hover:bg-emerald-50'}>
-                                <td className="px-4 py-4">
-                                  <span className="block font-mono text-[13px] font-black text-emerald-700">{b.id}</span>
+                            {[...bookings].sort((a, b) => {
+                              const aKey = a.status === '已排班' ? getRouteKey(a) : 'ZZZ|' + a.createdAt;
+                              const bKey = b.status === '已排班' ? getRouteKey(b) : 'ZZZ|' + b.createdAt;
+                              return aKey.localeCompare(bKey, 'zh-Hant');
+                            }).map((b, rowIndex, ordered) => {
+                              const groupKey = b.status === '已排班' ? getRouteKey(b) : '';
+                              const groupBookings = groupKey ? ordered.filter((item) => item.status === '已排班' && getRouteKey(item) === groupKey) : [b];
+                              const isGroupStart = groupKey && (rowIndex === 0 || getRouteKey(ordered[rowIndex - 1]) !== groupKey || ordered[rowIndex - 1].status !== '已排班');
+                              const isGroupEnd = groupKey && (rowIndex === ordered.length - 1 || getRouteKey(ordered[rowIndex + 1]) !== groupKey || ordered[rowIndex + 1].status !== '已排班');
+                              return (
+                              <tr key={b.id} className={(rowIndex % 2 === 0 ? 'bg-white ' : 'bg-slate-50 ') + 'align-top transition-colors hover:bg-emerald-50 ' + (groupKey ? '[&>td:first-child]:border-l-2 [&>td:first-child]:border-l-emerald-400 [&>td:last-child]:border-r-2 [&>td:last-child]:border-r-emerald-400 ' : '') + (isGroupStart ? '[&>td]:border-t-2 [&>td]:border-t-emerald-400 ' : '') + (isGroupEnd ? '[&>td]:border-b-2 [&>td]:border-b-emerald-400 ' : '')}>
+                                <td className="px-2 py-4 text-center">
+                                  <button onClick={() => setPrintableBooking(b)} className="whitespace-nowrap rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs font-bold text-slate-600 shadow-sm transition-colors hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700">🏷️ 標籤</button>
+                                </td>
+                                <td className="px-2 py-4">
+                                  <span className="block break-all font-mono text-[13px] font-black text-emerald-700">{b.id}</span>
                                   <span className="mt-1 block text-[11px] leading-4 text-slate-500">{getMinguoTime(b.createdAt)}</span>
                                 </td>
-                                <td className="px-4 py-4">
+                                <td className="px-2 py-4 break-words">
                                   <span className="block font-bold text-slate-100">{b.applicantName}</span>
                                   <span className="mt-1 block font-mono text-xs text-slate-400">{b.phone}</span>
                                 </td>
-                                <td className="px-4 py-4 leading-6 text-slate-300">
-                                  <span className="mr-1.5 inline-flex rounded-md bg-sky-400/10 px-2 py-0.5 text-xs font-bold text-sky-300">{b.district}</span>
+                                <td className="px-2 py-4 break-words leading-5 text-slate-300">
+                                  <span className="block font-black text-slate-700">{(b.county || '苗栗縣') + b.district}</span>
                                   {b.mapLink ? (
-                                    <a href={b.mapLink} target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-emerald-300 hover:underline" title="開啟 Google Maps">{b.address}</a>
-                                  ) : b.address}
+                                    <a href={b.mapLink} target="_blank" rel="noopener noreferrer" className="mt-1 block text-sky-700 underline decoration-sky-300 underline-offset-2 transition-colors hover:text-emerald-700" title="開啟 Google Maps">{getLocalAddress(b)}</a>
+                                  ) : <span className="mt-1 block">{getLocalAddress(b)}</span>}
                                 </td>
-                                <td className="px-4 py-4">
+                                <td className="px-2 py-4 break-words">
                                   <span className="font-bold text-slate-100">{formatMinguoDate(b.preferredDate)}</span>
                                   <span className="mt-1 block text-xs text-slate-400">{b.preferredTimeSlot?.split(' ')[0]}</span>
                                 </td>
-                                <td className="px-4 py-4 leading-6 text-slate-300">
+                                <td className="px-2 py-4 break-words leading-6 text-slate-300">
                                   {b.itemsChinese || b.items?.map(i => i.name + ' × ' + i.quantity).join('、')}
                                 </td>
-                                <td className="px-4 py-4">
-                                  <select value={b.status} onChange={(e) => handleAdminStatusChange(b, e.target.value)} className={'whitespace-nowrap rounded-lg border px-2 py-1 text-xs font-black ' + (
+                                {(!groupKey || isGroupStart) && <td rowSpan={groupKey ? groupBookings.length : 1} className={groupKey ? 'border-b-2 border-b-emerald-400 bg-emerald-50/50 px-2 py-4 align-top' : 'px-2 py-4 align-top'}>
+                                  <span className={'inline-flex whitespace-nowrap rounded-lg border px-2 py-1 text-xs font-black ' + (
                                     b.status === '已排班' ? 'border-emerald-400/25 bg-emerald-400/10 text-emerald-300' :
                                     b.status === '清運完成' ? 'border-sky-400/25 bg-sky-400/10 text-sky-300' :
                                     b.status === '已取消' ? 'border-rose-400/25 bg-rose-400/10 text-rose-300' :
                                     'border-amber-400/25 bg-amber-400/10 text-amber-300'
-                                  )} aria-label={'修改 ' + b.id + ' 狀態'}>
-                                    <option value="已收件">已收件</option><option value="待審核">待審核</option><option value="已排班">已排班</option><option value="清運完成">清運完成</option><option value="已取消">已取消</option>
-                                  </select>
-                                </td>
-                                <td className="px-4 py-4">
-                                  <div className="flex flex-wrap justify-end gap-2">
-                                    <button onClick={() => setPrintableBooking(b)} className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-bold text-slate-300 transition-colors hover:bg-white/10 hover:text-white">🏷️ 標籤</button>
-                                    {b.status !== '清運完成' && (
-                                      <div className="flex items-center gap-2">
-                                        <select value={vehicleSelections[b.id] || b.assignedVehicle || ''} onChange={(e) => setVehicleSelections((prev) => ({ ...prev, [b.id]: e.target.value }))} className="rounded-lg border border-slate-300 bg-white px-2 py-2 text-xs font-bold text-slate-700" aria-label={'選擇 ' + b.id + ' 的資源回收車'}>
-                                          <option value="">先選車輛</option>
+                                  )} aria-label={b.id + ' 目前狀態：' + b.status}>{b.status}</span>
+                                  {b.status === '已排班' && <><strong className="mt-2 block text-xs font-black leading-5 text-sky-700">{getDispatchLabel(b)}</strong><a href={getSuggestedRouteUrl(b)} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex rounded-lg border border-amber-300 bg-amber-100 px-2 py-1.5 text-[11px] font-black text-amber-800 transition-colors hover:bg-amber-300">✨ 最佳路線（{groupBookings.length}點）</a><div className="mt-2"><span className="block text-[10px] font-bold leading-4 text-slate-500">里程／碳排量</span><span className="mt-0.5 block text-[10px] font-black leading-4 text-emerald-700">{getRouteCarbon(b)}</span></div>{groupBookings.length > 1 && <div className="mt-3 border-t border-emerald-200 pt-2"><button onClick={() => openRouteEditor(b)} className="rounded-lg border border-violet-300 bg-violet-100 px-2 py-1.5 text-[11px] font-black text-violet-800 hover:bg-violet-300">↕ 自訂路線</button><span className="mt-2 block text-[10px] font-bold leading-4 text-slate-500">里程／碳排量</span><span className="mt-0.5 block text-[10px] font-black leading-4 text-violet-700">{getCustomRouteCarbon(b)}</span></div>}</>}
+                                </td>}
+                                <td className="bg-white px-2 py-4 align-top">
+                                  <div className="flex w-full flex-col gap-2">
+                                    {(b.status === '已收件' || b.status === '待審核' || b.status === '已取消') && (
+                                      <div className="flex w-full flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2">
+                                        <span className="text-[10px] font-black text-slate-500">車輛排班</span>
+                                        <select value={vehicleSelections[b.id] || (b.status === '已取消' ? '' : b.assignedVehicle) || ''} onChange={(e) => { const vehicle = e.target.value; setVehicleSelections((prev) => ({ ...prev, [b.id]: vehicle })); setTripSelections((prev) => ({ ...prev, [b.id]: vehicle ? getNextDispatchTrip(b, vehicle) : 1 })); }} className="w-full rounded-lg border border-slate-300 bg-white px-2 py-2 text-xs font-bold text-slate-700" aria-label={'選擇 ' + b.id + ' 的資源回收車'}>
+                                          <option value="">選擇車輛</option>
                                           {!vehicles.includes(b.assignedVehicle) && b.assignedVehicle && <option value={b.assignedVehicle}>{b.assignedVehicle}（已停用）</option>}
                                           {vehicles.map((vehicle) => <option key={vehicle} value={vehicle}>{vehicle} 車</option>)}
                                         </select>
-                                        <select value={tripSelections[b.id] || b.dispatchTrip || 1} onChange={(e) => setTripSelections((prev) => ({ ...prev, [b.id]: Number(e.target.value) }))} className="rounded-lg border border-slate-300 bg-white px-2 py-2 text-xs font-bold text-slate-700" aria-label={'選擇 ' + b.id + ' 的發車趟次'}>
-                                          {[1, 2, 3, 4].map((trip) => <option key={trip} value={trip}>第 {trip} 趟</option>)}
-                                        </select>
-                                        {(b.status === '已收件' || b.status === '待審核' || b.status === '已取消') && <button onClick={() => handleScheduleBooking(b)} disabled={!(vehicleSelections[b.id] || b.assignedVehicle)} className="rounded-lg border border-emerald-400/25 bg-emerald-400/10 px-3 py-2 text-xs font-black text-emerald-700 transition-colors hover:bg-emerald-400 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-40">核可排班</button>}
+                                        {(vehicleSelections[b.id] || (b.status === '已取消' ? '' : b.assignedVehicle)) && (() => { const vehicle = vehicleSelections[b.id] || b.assignedVehicle; const choices = getDispatchChoices(b, vehicle); return choices.length > 1 ? <label className="text-[10px] font-black text-slate-500">選擇合併或新增班次<select value={tripSelections[b.id] || getNextDispatchTrip(b, vehicle)} onChange={(e) => setTripSelections((prev) => ({ ...prev, [b.id]: Number(e.target.value) }))} className="mt-1 w-full rounded-lg border border-sky-200 bg-sky-50 px-2 py-2 text-[11px] font-black text-sky-700">{choices.map((choice) => <option key={choice.trip} value={choice.trip}>{getDispatchLabel(b, vehicle, choice.trip)}（{choice.mode === 'merge' ? '併入上一班' : '新增下一班'}）</option>)}</select></label> : <span className="block rounded-lg border border-sky-200 bg-sky-50 px-2 py-2 text-center text-[11px] font-black leading-4 text-sky-700">{getDispatchLabel(b, vehicle, 1)}（建立第1班）</span>; })()}
+                                        <button onClick={() => handleScheduleBooking(b)} disabled={!(vehicleSelections[b.id] || (b.status === '已取消' ? '' : b.assignedVehicle))} className="w-full rounded-lg bg-emerald-500 px-3 py-2 text-xs font-black text-white transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40">核可排班</button>
                                       </div>
                                     )}
                                     {b.status === '已排班' && (
-                                      <span className="flex w-full flex-col items-end gap-1.5"><span className="inline-flex items-center gap-1 whitespace-nowrap"><a href={getSuggestedRouteUrl(b)} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-amber-400/40 bg-amber-100 px-2 py-1.5 text-[11px] font-black text-amber-800 transition-colors hover:bg-amber-300">✨ {b.assignedVehicle ? b.assignedVehicle + ' 車' + getDispatchPeriod(b) + '第' + getDispatchTrip(b) + '趟最佳路線（' + getRouteBookings(b).length + '點）' : '最佳路線'}</a><span className="rounded-lg border border-emerald-300 bg-emerald-50 px-2 py-1.5 text-[10px] font-black text-emerald-700">{getRouteCarbon(b)}</span></span>{getRouteBookings(b).length > 1 && <span className="inline-flex items-center gap-1 whitespace-nowrap"><button onClick={() => openRouteEditor(b)} className="rounded-lg border border-violet-300 bg-violet-100 px-2 py-1.5 text-[11px] font-black text-violet-800 hover:bg-violet-300">↕ 自訂路線</button><span className="rounded-lg border border-violet-300 bg-violet-50 px-2 py-1.5 text-[10px] font-black text-violet-700">{getCustomRouteCarbon(b)}</span></span>}</span>
+                                      <div className="flex w-full flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2"><span className="text-center text-[10px] font-black text-slate-500">此案件</span><button onClick={() => setCompletionModalBooking(b)} className="w-full rounded-lg bg-emerald-500 px-2 py-2 text-xs font-black text-white transition-colors hover:bg-emerald-600">📸 拍照結案</button><button onClick={() => { if (window.confirm('確定取消案件「' + b.id + '」目前的排班？取消後可重新選擇車輛排班。')) handleAdminStatusChange(b, '已取消'); }} className="w-full rounded-lg border border-rose-300 bg-white px-2 py-2 text-xs font-black text-rose-600 transition-colors hover:bg-rose-500 hover:text-white">取消排班</button></div>
                                     )}
-                                    {b.status !== '清運完成' && b.status !== '已取消' && (
-                                      <button onClick={() => setCompletionModalBooking(b)} className="rounded-lg bg-emerald-400 px-3 py-2 text-xs font-black text-slate-950 shadow-sm transition-colors hover:bg-emerald-300">📸 拍照結案</button>
+                                    {b.status !== '已排班' && b.status !== '清運完成' && b.status !== '已取消' && (
+                                      <button onClick={() => setCompletionModalBooking(b)} className="w-full rounded-lg bg-emerald-500 px-3 py-2 text-xs font-black text-white shadow-sm transition-colors hover:bg-emerald-600">📸 拍照結案</button>
                                     )}
                                     {b.status === '清運完成' && (() => {
                                       const completedItem = b.statusTimeline?.slice().reverse().find(t => t.status === '清運完成' && t.drivePhotoUrl);
                                       return completedItem?.drivePhotoUrl ? (
-                                        <a href={completedItem.drivePhotoUrl} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-sky-400/25 bg-sky-400/10 px-3 py-2 text-xs font-bold text-sky-300 transition-colors hover:bg-sky-400 hover:text-slate-950">📷 結案照片</a>
-                                      ) : <span className="px-2 py-2 text-xs font-bold text-slate-500">已結案</span>;
+                                        <a href={completedItem.drivePhotoUrl} target="_blank" rel="noopener noreferrer" className="w-full rounded-lg border border-sky-300 bg-sky-50 px-3 py-2 text-center text-xs font-bold text-sky-700 transition-colors hover:bg-sky-500 hover:text-white">📷 查看結案照片</a>
+                                      ) : <span className="w-full rounded-lg bg-slate-100 px-2 py-2 text-center text-xs font-bold text-slate-500">已結案</span>;
                                     })()}
                                   </div>
                                 </td>
                               </tr>
-                            ))}
+                            )})}
                           </tbody>
                         </table>
                       </div>
@@ -1522,7 +1554,7 @@
           {routeEditor && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
               <div className="w-full max-w-2xl rounded-3xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
-                <div className="mb-4 flex items-start justify-between"><div><h3 className="text-lg font-black text-white">↕ 自訂 {routeEditor.booking.assignedVehicle} 車{getDispatchPeriod(routeEditor.booking)}第 {getDispatchTrip(routeEditor.booking)} 趟路線</h3><p className="mt-1 text-xs text-slate-400">{formatMinguoDate(routeEditor.booking.preferredDate)}・起點固定為出車地址</p></div><button onClick={() => setRouteEditor(null)} className="text-lg font-bold text-slate-400">✕</button></div>
+                <div className="mb-4 flex items-start justify-between"><div><h3 className="text-lg font-black text-white">↕ 自訂 {getDispatchLabel(routeEditor.booking)}路線</h3><p className="mt-1 text-xs text-slate-400">{formatMinguoDate(routeEditor.booking.preferredDate)}・起點固定為出車地址</p></div><button onClick={() => setRouteEditor(null)} className="text-lg font-bold text-slate-400">✕</button></div>
                 <div className="max-h-[55vh] space-y-2 overflow-y-auto">
                   {routeEditor.stops.map((stop, index) => <div key={stop.id} className="flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-800 p-3"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-400 font-black text-slate-950">{index + 1}</span><div className="min-w-0 flex-1"><strong className="text-sm text-white">{stop.applicantName}</strong><p className="truncate text-xs text-slate-400">{stop.address}</p></div><button onClick={() => moveRouteStop(index, -1)} disabled={index === 0} className="rounded-lg bg-slate-700 px-3 py-2 font-bold text-white disabled:opacity-30">↑</button><button onClick={() => moveRouteStop(index, 1)} disabled={index === routeEditor.stops.length - 1} className="rounded-lg bg-slate-700 px-3 py-2 font-bold text-white disabled:opacity-30">↓</button></div>)}
                 </div>

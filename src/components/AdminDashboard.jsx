@@ -18,6 +18,19 @@ export default function AdminDashboard({ bookings, setBookings, onOpenTagModal }
   const getDispatchPeriod = (booking) => String(booking.preferredTimeSlot || '未指定時段').trim().split(/\s+/)[0];
   const getDispatchTrip = (booking) => Number(booking.dispatchTrip || 1);
   const getRouteKey = (booking) => `${booking.preferredDate}|${booking.assignedVehicle}|${getDispatchPeriod(booking)}|${getDispatchTrip(booking)}`;
+  const getNextDispatchTrip = (booking, vehicle) => {
+    if (!vehicle) return 1;
+    const trips = bookings.filter((item) => item.id !== booking.id && item.status === '已排班' && item.preferredDate === booking.preferredDate && item.assignedVehicle === vehicle && getDispatchPeriod(item) === getDispatchPeriod(booking)).map(getDispatchTrip);
+    return trips.length ? Math.max(...trips) + 1 : 1;
+  };
+  const getDispatchChoices = (booking, vehicle) => {
+    if (!vehicle) return [];
+    const existingTrips = [...new Set(bookings.filter((item) => item.id !== booking.id && item.status === '已排班' && item.preferredDate === booking.preferredDate && item.assignedVehicle === vehicle && getDispatchPeriod(item) === getDispatchPeriod(booking)).map(getDispatchTrip))].sort((a, b) => a - b);
+    if (!existingTrips.length) return [{ trip: 1, mode: 'new' }];
+    const previousTrip = existingTrips[existingTrips.length - 1];
+    return [{ trip: previousTrip, mode: 'merge' }, { trip: previousTrip + 1, mode: 'new' }];
+  };
+  const getDispatchLabel = (booking, vehicle = booking.assignedVehicle, trip = getDispatchTrip(booking)) => vehicle ? `${vehicle}車${getDispatchPeriod(booking)}第${trip}班` : '';
   const saveVehicleCache = (next) => { setVehicles(next); localStorage.setItem('recycling_vehicles', JSON.stringify(next)); };
   const loadVehicles = async () => { const gasUrl = localStorage.getItem('gas_web_app_url'); if (!gasUrl) return; try { const response = await fetch(`${gasUrl}?action=getVehicles`); const result = await response.json(); const valid = Array.isArray(result.data) ? result.data.filter((item) => typeof item === 'string' && item.trim()).map((item) => item.trim()) : []; if (result.status === 'success' && result.resource === 'vehicles' && valid.length) saveVehicleCache(valid); } catch (error) { console.error('Vehicle Fetch Error:', error); } };
   const addVehicle = async () => { const value = newVehicle.trim(); if (!value) return; if (vehicles.some((item) => item.toLowerCase() === value.toLowerCase())) { window.alert('此車號已存在。'); return; } const gasUrl = localStorage.getItem('gas_web_app_url'); try { const response = await fetch(`${gasUrl}?action=addVehicle&vehicle=${encodeURIComponent(value)}`); const result = await response.json(); if (result.status !== 'success' || result.resource !== 'vehicles') throw new Error(result.resource !== 'vehicles' ? 'GAS 尚未部署車輛管理新版，請重新部署網頁應用程式。' : result.message); setNewVehicle(''); await loadVehicles(); } catch (error) { window.alert(`新增車號失敗：${error.message}`); } };
@@ -143,8 +156,8 @@ export default function AdminDashboard({ bookings, setBookings, onOpenTagModal }
   };
 
   const handleSchedule = (booking) => {
-    const vehicle = vehicleSelections[booking.id] || booking.assignedVehicle;
-    const dispatchTrip = Number(tripSelections[booking.id] || booking.dispatchTrip || 1);
+    const vehicle = vehicleSelections[booking.id] || (booking.status === '已取消' ? '' : booking.assignedVehicle);
+    const dispatchTrip = Number(tripSelections[booking.id] || getNextDispatchTrip(booking, vehicle));
     if (!vehicle) return;
     const nowTime = new Date().toLocaleString();
     setBookings((prev) => prev.map((b) => b.id === booking.id ? {
@@ -157,14 +170,14 @@ export default function AdminDashboard({ bookings, setBookings, onOpenTagModal }
       statusTimeline: [...(b.statusTimeline || []), {
         status: '已排班',
         time: nowTime,
-        note: `已指派資源回收車 ${vehicle} 車・${getDispatchPeriod(booking)}第 ${dispatchTrip} 趟`
+        note: `已排定 ${getDispatchLabel(booking, vehicle, dispatchTrip)}`
       }]
     } : b));
   };
 
   const handleStatusChange = (booking, newStatus) => {
     if (newStatus === '已排班') {
-      if (!(vehicleSelections[booking.id] || booking.assignedVehicle)) {
+      if (!(vehicleSelections[booking.id] || (booking.status === '已取消' ? '' : booking.assignedVehicle))) {
         window.alert('請先選擇車號，再將狀態改為已排班。');
         return;
       }
@@ -199,6 +212,12 @@ export default function AdminDashboard({ bookings, setBookings, onOpenTagModal }
     link.click();
     document.body.removeChild(link);
   };
+
+  const orderedBookings = [...filteredBookings].sort((a, b) => {
+    const aKey = a.status === '已排班' ? getRouteKey(a) : `ZZZ|${a.createdAt}`;
+    const bKey = b.status === '已排班' ? getRouteKey(b) : `ZZZ|${b.createdAt}`;
+    return aKey.localeCompare(bKey, 'zh-Hant');
+  });
 
   return (
     <div className="max-w-7xl mx-auto space-y-8">
@@ -323,29 +342,39 @@ export default function AdminDashboard({ bookings, setBookings, onOpenTagModal }
 
       {/* Bookings Data Table */}
       <div className="rounded-2xl border border-slate-200 bg-slate-50 shadow-lg shadow-slate-300/20 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+        <div className="w-full overflow-hidden">
+          <table className="w-full table-fixed text-left text-xs">
             <thead className="bg-emerald-50/70 text-slate-600 border-b border-slate-200 uppercase tracking-wider font-bold">
               <tr>
-                <th className="py-3.5 px-4">預約單號 / 時間</th>
-                <th className="py-3.5 px-4">申請人與電話</th>
-                <th className="py-3.5 px-4">行政區與一樓清運地址</th>
-                <th className="py-3.5 px-4">約定日期/時段</th>
-                <th className="py-3.5 px-4">清運品項</th>
-                <th className="py-3.5 px-4">狀態</th>
-                <th className="py-3.5 px-4 text-right">操作與審核</th>
+                <th className="w-[7%] py-3.5 px-2 text-center">標籤</th>
+                <th className="w-[13%] py-3.5 px-2">預約單號 / 時間</th>
+                <th className="w-[10%] py-3.5 px-2">申請人與電話</th>
+                <th className="w-[20%] py-3.5 px-2">行政區與一樓清運地址</th>
+                <th className="w-[10%] py-3.5 px-2">約定日期/時段</th>
+                <th className="w-[14%] py-3.5 px-2">清運品項</th>
+                <th className="w-[8%] py-3.5 px-2">狀態</th>
+                <th className="w-[18%] py-3.5 px-2 text-right">操作與審核</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 text-slate-700">
               {filteredBookings.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-500">
+                  <td colSpan={8} className="py-12 text-center text-slate-500">
                     尚無符合條件的清運預約資料
                   </td>
                 </tr>
               ) : (
-                filteredBookings.map((b) => (
-                  <tr key={b.id} className="odd:bg-white even:bg-slate-50 hover:bg-emerald-50 transition-colors">
+                orderedBookings.map((b, rowIndex) => {
+                  const groupKey = b.status === '已排班' ? getRouteKey(b) : '';
+                  const isGroupStart = groupKey && (rowIndex === 0 || orderedBookings[rowIndex - 1].status !== '已排班' || getRouteKey(orderedBookings[rowIndex - 1]) !== groupKey);
+                  const isGroupEnd = groupKey && (rowIndex === orderedBookings.length - 1 || orderedBookings[rowIndex + 1].status !== '已排班' || getRouteKey(orderedBookings[rowIndex + 1]) !== groupKey);
+                  return (
+                  <tr key={b.id} className={`odd:bg-white even:bg-slate-50 hover:bg-emerald-50 transition-colors ${groupKey ? '[&>td:first-child]:border-l-2 [&>td:first-child]:border-l-emerald-400 [&>td:last-child]:border-r-2 [&>td:last-child]:border-r-emerald-400' : ''} ${isGroupStart ? '[&>td]:border-t-2 [&>td]:border-t-emerald-400' : ''} ${isGroupEnd ? '[&>td]:border-b-2 [&>td]:border-b-emerald-400' : ''}`}>
+                    <td className="py-3.5 px-4 text-center">
+                      <button onClick={() => onOpenTagModal(b)} className="inline-flex items-center gap-1 rounded-lg bg-slate-800 px-2 py-1.5 font-bold text-slate-300 transition-all hover:bg-slate-700 hover:text-white" title="預覽標籤與 QR Code">
+                        <Eye className="w-4 h-4" /><span>標籤</span>
+                      </button>
+                    </td>
                     <td className="py-3.5 px-4 font-mono font-bold text-emerald-400">
                       <div>{b.id}</div>
                       <span className="text-[10px] text-slate-500 font-sans font-normal">{b.createdAt}</span>
@@ -374,7 +403,7 @@ export default function AdminDashboard({ bookings, setBookings, onOpenTagModal }
                       </div>
                     </td>
                     <td className="py-3.5 px-4 font-bold">
-                      <select value={b.status} onChange={(e) => handleStatusChange(b, e.target.value)} className={`rounded-lg border px-2 py-1 text-[11px] font-bold ${
+                      <span className={`inline-flex rounded-lg border px-2 py-1 text-[11px] font-bold ${
                         b.status === '已排班'
                           ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
                           : b.status === '清運完成'
@@ -382,52 +411,38 @@ export default function AdminDashboard({ bookings, setBookings, onOpenTagModal }
                           : b.status === '已取消'
                           ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
                           : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
-                      }`} aria-label={`修改 ${b.id} 狀態`}>
-                        <option value="已收件">已收件</option>
-                        <option value="待審核">待審核</option>
-                        <option value="已排班">已排班</option>
-                        <option value="清運完成">清運完成</option>
-                        <option value="已取消">已取消</option>
-                      </select>
+                      }`} aria-label={`${b.id} 目前狀態：${b.status}`}>{b.status}</span>
                     </td>
                     <td className="py-3.5 px-4 text-right">
                       <div className="flex items-center justify-end space-x-2">
-                        <button
-                          onClick={() => onOpenTagModal(b)}
-                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all"
-                          title="預覽標籤與 QR Code"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-
-                        {b.status !== '清運完成' && (
+                        {(b.status === '已收件' || b.status === '待審核' || b.status === '已取消') && (
                           <div className="flex items-center gap-1.5">
-                            <select value={vehicleSelections[b.id] || b.assignedVehicle || ''} onChange={(e) => setVehicleSelections((prev) => ({ ...prev, [b.id]: e.target.value }))} className="rounded-lg border border-slate-600 bg-slate-800 px-2 py-1 text-xs font-bold text-slate-200" aria-label={`選擇 ${b.id} 的資源回收車`}>
-                              <option value="">先選車輛</option>
+                            <select value={vehicleSelections[b.id] || (b.status === '已取消' ? '' : b.assignedVehicle) || ''} onChange={(e) => { const vehicle = e.target.value; setVehicleSelections((prev) => ({ ...prev, [b.id]: vehicle })); setTripSelections((prev) => ({ ...prev, [b.id]: vehicle ? getNextDispatchTrip(b, vehicle) : 1 })); }} className="rounded-lg border border-slate-600 bg-slate-800 px-2 py-1 text-xs font-bold text-slate-200" aria-label={`選擇 ${b.id} 的資源回收車`}>
+                              <option value="">選擇車輛</option>
                               {!vehicles.includes(b.assignedVehicle) && b.assignedVehicle && <option value={b.assignedVehicle}>{b.assignedVehicle}（已停用）</option>}
                               {vehicles.map((vehicle) => <option key={vehicle} value={vehicle}>{vehicle} 車</option>)}
                             </select>
-                            <select value={tripSelections[b.id] || b.dispatchTrip || 1} onChange={(e) => setTripSelections((prev) => ({ ...prev, [b.id]: Number(e.target.value) }))} className="rounded-lg border border-slate-600 bg-slate-800 px-2 py-1 text-xs font-bold text-slate-200" aria-label={`選擇 ${b.id} 的發車趟次`}>
-                              {[1, 2, 3, 4].map((trip) => <option key={trip} value={trip}>第 {trip} 趟</option>)}
-                            </select>
-                            {(b.status === '已收件' || b.status === '待審核' || b.status === '已取消') && <button onClick={() => handleSchedule(b)} disabled={!(vehicleSelections[b.id] || b.assignedVehicle)} className="px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500 text-emerald-300 hover:text-slate-950 font-bold transition-all disabled:cursor-not-allowed disabled:opacity-40">核可排班</button>}
+                            {(vehicleSelections[b.id] || (b.status === '已取消' ? '' : b.assignedVehicle)) && (() => { const vehicle = vehicleSelections[b.id] || b.assignedVehicle; const choices = getDispatchChoices(b, vehicle); return choices.length > 1 ? <select value={tripSelections[b.id] || getNextDispatchTrip(b, vehicle)} onChange={(e) => setTripSelections((prev) => ({ ...prev, [b.id]: Number(e.target.value) }))} className="rounded-lg border border-sky-500/30 bg-sky-500/10 px-2 py-1 text-xs font-black text-sky-300">{choices.map((choice) => <option key={choice.trip} value={choice.trip}>{getDispatchLabel(b, vehicle, choice.trip)}（{choice.mode === 'merge' ? '併入上一班' : '新增下一班'}）</option>)}</select> : <span className="rounded-lg border border-sky-500/30 bg-sky-500/10 px-2 py-1 text-xs font-black text-sky-300">{getDispatchLabel(b, vehicle, 1)}（建立第1班）</span>; })()}
+                            {(b.status === '已收件' || b.status === '待審核' || b.status === '已取消') && <button onClick={() => handleSchedule(b)} disabled={!(vehicleSelections[b.id] || (b.status === '已取消' ? '' : b.assignedVehicle))} className="px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500 text-emerald-300 hover:text-slate-950 font-bold transition-all disabled:cursor-not-allowed disabled:opacity-40">核可排班</button>}
                           </div>
                         )}
 
                         {b.status === '已排班' && (
                           <>
+                            <strong className="rounded-lg border border-sky-500/30 bg-sky-500/10 px-2.5 py-1 text-xs font-black text-sky-300">{getDispatchLabel(b)}</strong>
                             <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap">
                               <a href={getSuggestedRouteUrl(b)} target="_blank" rel="noopener noreferrer" className="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 hover:bg-amber-500 hover:text-slate-950 font-bold">📍 {b.assignedVehicle ? `${b.assignedVehicle} 車${getDispatchPeriod(b)}第 ${getDispatchTrip(b)} 趟路線（${getRouteBookings(b).length} 點）` : '建議路線'}</a>
                               <span className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-xs font-black text-emerald-300">{getRouteCarbon(b)}</span>
                               {getRouteBookings(b).length > 1 && <><button onClick={() => openRouteEditor(b)} className="px-2.5 py-1 rounded-lg bg-violet-500/20 text-violet-300 hover:bg-violet-500 hover:text-white font-bold">↕ 自訂路線</button><span className="rounded-lg border border-violet-500/30 bg-violet-500/10 px-2.5 py-1 text-xs font-black text-violet-300">{getCustomRouteCarbon(b)}</span></>}
                             </span>
                             <button onClick={() => handleUpdateStatus(b.id, '清運完成', '隊員已於現場載運完畢')} className="px-2.5 py-1 rounded-lg bg-blue-500/20 hover:bg-blue-500 text-blue-300 hover:text-slate-950 font-bold transition-all">結案完成</button>
+                            <button onClick={() => { if (window.confirm(`確定取消案件「${b.id}」目前的排班？取消後可重新選擇車輛排班。`)) handleStatusChange(b, '已取消'); }} className="px-2.5 py-1 rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-white font-bold transition-all">取消排班</button>
                           </>
                         )}
                       </div>
                     </td>
                   </tr>
-                ))
+                )})
               )}
             </tbody>
           </table>
