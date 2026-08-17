@@ -130,6 +130,26 @@
     .civic-shell footer .text-slate-500 { color: rgba(236,253,245,.68) !important; }
     .civic-shell .success-summary,
     .civic-shell .success-summary * { color: #ffffff !important; }
+    /* Mobile layout: keep forms, cards and dialogs inside the viewport. */
+    @media (max-width: 640px) {
+      html, body, #root { width: 100%; max-width: 100%; overflow-x: hidden; }
+      .civic-shell main { padding-left: 0.75rem !important; padding-right: 0.75rem !important; }
+      .civic-shell .glass-card,
+      .civic-shell .glass-panel { border-radius: 1rem !important; }
+      .civic-shell :where(input, select, textarea, button, a) { min-width: 0; }
+      .civic-shell code { overflow-wrap: anywhere; word-break: break-word; }
+      .civic-shell > .fixed.inset-0 {
+        align-items: flex-start !important;
+        overflow-y: auto;
+        padding: 0.75rem !important;
+      }
+      .civic-shell > .fixed.inset-0 > div {
+        max-height: none !important;
+        padding: 1rem !important;
+        border-radius: 1rem !important;
+      }
+      #printable-tag { padding: 0.75rem !important; }
+    }
     /* Print media styling for furniture booking identification tag */
     @media print {
       @page { size: A4 portrait; margin: 12mm; }
@@ -942,9 +962,9 @@
           {/* Header */}
           <header className="sticky top-0 z-40 border-b border-emerald-900/10 bg-white/90 text-slate-800 shadow-[0_8px_30px_-24px_rgba(6,78,59,.45)] backdrop-blur-xl no-print">
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-              <div className="flex min-h-20 items-center justify-between gap-3 py-3">
+              <div className="flex min-h-16 items-center justify-between gap-2 py-2 sm:min-h-20 sm:gap-3 sm:py-3">
                 <button className="group flex min-w-0 items-center gap-3 text-left" onClick={() => window.location.href = './index.html'} aria-label="回到市民服務">
-                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-700 text-xl text-white shadow-lg transition-transform group-hover:-translate-y-0.5">🚚</span>
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-700 text-lg text-white shadow-lg transition-transform group-hover:-translate-y-0.5 sm:h-12 sm:w-12 sm:rounded-2xl sm:text-xl">🚚</span>
                   <span className="min-w-0">
                     <span className="flex items-center gap-2">
                       <span className="truncate text-base font-black tracking-tight text-emerald-950 sm:text-xl">清潔隊管理後台</span>
@@ -966,14 +986,14 @@
           </header>
 
           {/* Main Content View */}
-          <main className="relative z-10 flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-7 sm:py-12 no-print">
+          <main className="relative z-10 flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-5 sm:py-12 no-print">
             
             {/* TAB 1: Booking Wizard Form */}
             {activeTab === 'booking' && (
-              <form onSubmit={handleFormSubmit} className="max-w-4xl mx-auto space-y-8">
+              <form onSubmit={handleFormSubmit} className="max-w-4xl mx-auto space-y-5 sm:space-y-8">
                 
                 {/* Hero Banner */}
-                <div className="booking-hero relative rounded-[2rem] p-6 sm:p-9 border border-emerald-200 shadow-xl overflow-hidden">
+                <div className="booking-hero relative rounded-2xl p-5 sm:rounded-[2rem] sm:p-9 border border-emerald-200 shadow-xl overflow-hidden">
                   <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                     <div>
                       <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-white/80 text-emerald-800 border border-emerald-200 mb-3 shadow-sm">
@@ -1298,7 +1318,7 @@
               <div className="max-w-4xl mx-auto space-y-8">
                 <div className="glass-panel rounded-3xl p-6 sm:p-8 border border-slate-700/60 shadow-2xl space-y-6">
                   <h2 className="text-2xl font-black text-white">🔍 廢棄傢俱預約進度查詢</h2>
-                  <form onSubmit={handleSearchSubmit} className="flex gap-3">
+                  <form onSubmit={handleSearchSubmit} className="flex flex-col gap-3 sm:flex-row">
                     <input
                       type="text"
                       placeholder="請輸入手機號碼 (如 0912-345-678) 或預約單號 (如 115-0815-001)"
@@ -1306,7 +1326,7 @@
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-100"
                     />
-                    <button type="submit" className="px-6 py-3 rounded-xl bg-emerald-500 text-slate-950 font-black text-sm">
+                    <button type="submit" className="w-full px-6 py-3 rounded-xl bg-emerald-500 text-slate-950 font-black text-sm sm:w-auto">
                       查詢
                     </button>
                   </form>
@@ -1334,7 +1354,7 @@
                           </button>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3 text-xs">
+                        <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2">
                           <div><span className="text-slate-400">申請人：</span><strong>{b.applicantName} ({b.phone})</strong></div>
                           <div><span className="text-slate-400">約定日期：</span><strong>{formatMinguoDate(b.preferredDate)} ({b.preferredTimeSlot.split(' ')[0]})</strong></div>
                           <div className="col-span-2"><span className="text-slate-400">地址：</span><strong>{b.address}</strong></div>
@@ -1408,14 +1428,14 @@
                         <h2 className="text-2xl font-black text-white">🚚 清潔隊廢棄傢俱車輛調度後台</h2>
                         <p className="text-xs text-slate-400">支援核可排班與現場拍照結案，照片自動上傳至 Google Drive 備查</p>
                       </div>
-                      <div className="flex items-center space-x-3">
+                      <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center sm:space-x-3">
                         <button onClick={() => setShowVehicleManager((current) => !current)} className="px-4 py-2 rounded-xl bg-slate-800 text-sky-300 text-xs font-bold border border-slate-700 hover:text-white">
                           🚚 車輛管理
                         </button>
                         <button onClick={() => { setIsAdminAuth(false); localStorage.removeItem('admin_auth_until'); }} className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold border border-slate-700 hover:text-white">
                           登出
                         </button>
-                        <button onClick={handleExportCSV} className="px-4 py-2 rounded-xl bg-slate-800 text-emerald-400 text-xs font-bold border border-slate-700">
+                        <button onClick={handleExportCSV} className="col-span-2 px-4 py-2 rounded-xl bg-slate-800 text-emerald-400 text-xs font-bold border border-slate-700 sm:col-span-1">
                           📊 匯出 Excel / CSV
                         </button>
                       </div>
@@ -1457,8 +1477,8 @@
                         </div>
                       </div>
 
-                      <div className="w-full overflow-hidden">
-                        <table className="w-full table-fixed text-left text-sm">
+                      <div className="w-full overflow-x-auto overscroll-x-contain">
+                        <table className="min-w-[1120px] table-fixed text-left text-sm">
                           <thead className="border-b border-slate-200 bg-slate-100 text-xs font-bold tracking-wide text-slate-600">
                             <tr>
                               <th className="w-[7%] px-2 py-3.5 text-center">標籤</th>
