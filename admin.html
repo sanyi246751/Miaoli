@@ -203,6 +203,11 @@
         text-align: center !important;
       }
     }
+
+    /* Dashboard 不顯示額外的關鍵字品項合計列。 */
+    tfoot tr.border-t.border-slate-700.bg-slate-800 {
+      display: none;
+    }
   </style>
 </head>
 <body class="min-h-screen selection:bg-emerald-500 selection:text-slate-950">
@@ -337,23 +342,25 @@
       const [activeTab, setActiveTab] = useState('admin'); // 獨立後台頁面
       const [vehicleSelections, setVehicleSelections] = useState({});
       const [tripSelections, setTripSelections] = useState({});
+      const [appointmentTimeEditor, setAppointmentTimeEditor] = useState(null);
       const [vehicles, setVehicles] = useState(() => { try { const saved = JSON.parse(localStorage.getItem('recycling_vehicles') || '["A","B"]'); const valid = Array.isArray(saved) ? saved.filter((item) => typeof item === 'string' && item.trim()).map((item) => item.trim()) : []; return valid.length ? valid : ['A', 'B']; } catch (e) { return ['A', 'B']; } });
       const [showVehicleManager, setShowVehicleManager] = useState(false);
       const [newVehicle, setNewVehicle] = useState('');
       const [routeEditor, setRouteEditor] = useState(null);
       const [routeCalculations, setRouteCalculations] = useState(() => { try { return JSON.parse(localStorage.getItem('recycling_route_calculations') || '{}'); } catch (e) { return {}; } });
       const [customRoutes, setCustomRoutes] = useState(() => { try { return JSON.parse(localStorage.getItem('recycling_custom_routes') || '{}'); } catch (e) { return {}; } });
-      const getDispatchPeriod = (booking) => String(booking.preferredTimeSlot || '未指定時段').trim().split(/\s+/)[0];
+      const getDispatchDate = (booking) => booking.adjustedDate || booking.preferredDate;
+      const getDispatchPeriod = (booking) => booking.adjustedPeriod || String(booking.preferredTimeSlot || '未指定時段').trim().split(/\s+/)[0];
       const getDispatchTrip = (booking) => Number(booking.dispatchTrip || 1);
-      const getRouteKey = (booking) => booking.preferredDate + '|' + booking.assignedVehicle + '|' + getDispatchPeriod(booking) + '|' + getDispatchTrip(booking);
+      const getRouteKey = (booking) => getDispatchDate(booking) + '|' + booking.assignedVehicle + '|' + getDispatchPeriod(booking) + '|' + getDispatchTrip(booking);
       const getNextDispatchTrip = (booking, vehicle) => {
         if (!vehicle) return 1;
-        const trips = bookings.filter((item) => item.id !== booking.id && item.status === '已排班' && item.preferredDate === booking.preferredDate && item.assignedVehicle === vehicle && getDispatchPeriod(item) === getDispatchPeriod(booking)).map(getDispatchTrip);
+        const trips = bookings.filter((item) => item.id !== booking.id && item.status === '已排班' && getDispatchDate(item) === getDispatchDate(booking) && item.assignedVehicle === vehicle && getDispatchPeriod(item) === getDispatchPeriod(booking)).map(getDispatchTrip);
         return trips.length ? Math.max(...trips) + 1 : 1;
       };
       const getDispatchChoices = (booking, vehicle) => {
         if (!vehicle) return [];
-        const existingTrips = [...new Set(bookings.filter((item) => item.id !== booking.id && item.status === '已排班' && item.preferredDate === booking.preferredDate && item.assignedVehicle === vehicle && getDispatchPeriod(item) === getDispatchPeriod(booking)).map(getDispatchTrip))].sort((a, b) => a - b);
+        const existingTrips = [...new Set(bookings.filter((item) => item.id !== booking.id && item.status === '已排班' && getDispatchDate(item) === getDispatchDate(booking) && item.assignedVehicle === vehicle && getDispatchPeriod(item) === getDispatchPeriod(booking)).map(getDispatchTrip))].sort((a, b) => a - b);
         if (!existingTrips.length) return [{ trip: 1, mode: 'new' }];
         const previousTrip = existingTrips[existingTrips.length - 1];
         return [{ trip: previousTrip, mode: 'merge' }, { trip: previousTrip + 1, mode: 'new' }];
@@ -361,6 +368,7 @@
       const getDispatchTimeLabel = (booking) => {
         const raw = String(booking.preferredTimeSlot || '').trim();
         const period = getDispatchPeriod(booking);
+        if (booking.adjustedPeriod) return booking.adjustedPeriod;
         const match = raw.match(/(\d{1,2}):(\d{2})\s*[-~～至]\s*(\d{1,2}):(\d{2})/);
         if (!match) return raw.replace(/\s+/g, '') || period;
         const formatTime = (hour, minute) => Number(minute) === 0 ? Number(hour) + '點' : Number(hour) + '點' + minute + '分';
@@ -382,6 +390,11 @@
       const [showGasModal, setShowGasModal] = useState(false);
       const [isSyncingGas, setIsSyncingGas] = useState(false);
       const [syncMessage, setSyncMessage] = useState('');
+      const [caseListView, setCaseListView] = useState('active');
+      const [dashboardPeriod, setDashboardPeriod] = useState('all');
+      const [dashboardView, setDashboardView] = useState('status');
+      const [dashboardDetailType, setDashboardDetailType] = useState('collected');
+      const [dashboardKeyword, setDashboardKeyword] = useState('');
       const loadVehicles = async () => { if (!gasUrl) return; try { const response = await fetch(gasUrl + '?action=getVehicles'); const result = await response.json(); const valid = Array.isArray(result.data) ? result.data.filter((item) => typeof item === 'string' && item.trim()).map((item) => item.trim()) : []; if (result.status === 'success' && result.resource === 'vehicles' && valid.length) saveVehicleCache(valid); } catch (error) { console.error('Vehicle Fetch Error:', error); } };
       const addVehicle = async () => { const value = newVehicle.trim(); if (!value) return; if (vehicles.some((item) => item.toLowerCase() === value.toLowerCase())) { window.alert('此車號已存在。'); return; } try { const response = await fetch(gasUrl + '?action=addVehicle&vehicle=' + encodeURIComponent(value)); const result = await response.json(); if (result.status !== 'success' || result.resource !== 'vehicles') throw new Error(result.resource !== 'vehicles' ? 'GAS 尚未部署車輛管理新版，請重新部署網頁應用程式。' : result.message); setNewVehicle(''); await loadVehicles(); } catch (error) { window.alert('新增車號失敗：' + error.message); } };
       const removeVehicle = async (vehicle) => { if (vehicles.length <= 1) { window.alert('至少需要保留一台車。'); return; } if (!window.confirm('確定移除車號「' + vehicle + '」？已排班案件仍會保留原車號。')) return; try { const response = await fetch(gasUrl + '?action=deleteVehicle&vehicle=' + encodeURIComponent(vehicle)); const result = await response.json(); if (result.status !== 'success' || result.resource !== 'vehicles') throw new Error(result.resource !== 'vehicles' ? 'GAS 尚未部署車輛管理新版，請重新部署網頁應用程式。' : result.message); await loadVehicles(); } catch (error) { window.alert('移除車號失敗：' + error.message); } };
@@ -415,7 +428,9 @@
                 assignedVehicle: localBooking.assignedVehicle,
                 dispatchTrip: localBooking.dispatchTrip || 1,
                 dispatchOrigin: localBooking.dispatchOrigin,
-                suggestedRouteUrl: localBooking.suggestedRouteUrl
+                suggestedRouteUrl: localBooking.suggestedRouteUrl,
+                adjustedDate: localBooking.adjustedDate || remoteBooking.adjustedDate || '',
+                adjustedPeriod: localBooking.adjustedPeriod || remoteBooking.adjustedPeriod || ''
               };
             }));
             setSyncMessage(`已成功從 Google 試算表同步 ${json.data.length} 筆資料`);
@@ -455,6 +470,13 @@
       const [successBooking, setSuccessBooking] = useState(null);
       const [printableBooking, setPrintableBooking] = useState(null);
       const [completionModalBooking, setCompletionModalBooking] = useState(null); // Sanitation Photo Completion Modal
+      const [photoPreview, setPhotoPreview] = useState(null);
+      const getPhotoPreviewUrl = (url) => {
+        const value = String(url || '');
+        if (!value.includes('drive.google.com')) return value;
+        const match = value.match(/\/d\/([-\w]{20,})/) || value.match(/[?&]id=([-\w]{20,})/) || value.match(/[-\w]{25,}/);
+        return match ? 'https://drive.google.com/thumbnail?id=' + (match[1] || match[0]) + '&sz=w1600' : value;
+      };
 
       // Admin Auth State
       const ADMIN_SESSION_MS = 30 * 60 * 1000;
@@ -527,12 +549,16 @@
       const [errors, setErrors] = useState({});
       const [isSubmitting, setIsSubmitting] = useState(false);
       const [submitSecondsLeft, setSubmitSecondsLeft] = useState(0);
+      const [quantityDrafts, setQuantityDrafts] = useState({});
+      const [quantitySaving, setQuantitySaving] = useState('');
+      const [quantityEditing, setQuantityEditing] = useState({});
+      const [aiSaving, setAiSaving] = useState('');
 
       // Completion Photo Upload State for Sanitation Worker
-      const [completionPhotoBase64, setCompletionPhotoBase64] = useState('');
-      const [completionPhotoName, setCompletionPhotoName] = useState('');
+      const [completionPhotos, setCompletionPhotos] = useState([]);
       const [completionNote, setCompletionNote] = useState('隊員已現場載運完畢，路面恢復清潔並拍攝照片結案。');
       const [isUploadingDrive, setIsUploadingDrive] = useState(false);
+      const [completionUploadSecondsLeft, setCompletionUploadSecondsLeft] = useState(0);
 
       // Query Search state
       const [searchQuery, setSearchQuery] = useState('');
@@ -739,7 +765,7 @@
         }
       };
 
-      const getRouteBookings = (booking) => bookings.filter((item) => item.preferredDate === booking.preferredDate && item.assignedVehicle === booking.assignedVehicle && getDispatchPeriod(item) === getDispatchPeriod(booking) && getDispatchTrip(item) === getDispatchTrip(booking) && item.status === '已排班');
+      const getRouteBookings = (booking) => bookings.filter((item) => getDispatchDate(item) === getDispatchDate(booking) && item.assignedVehicle === booking.assignedVehicle && getDispatchPeriod(item) === getDispatchPeriod(booking) && getDispatchTrip(item) === getDispatchTrip(booking) && item.status === '已排班');
 
       const buildRouteUrl = (orderedBookings) => {
         const stops = orderedBookings.map((item) => item.mapAddress || item.address).filter(Boolean);
@@ -806,6 +832,26 @@
       const openRouteEditor = (booking) => { const available = getRouteBookings(booking); const saved = customRoutes[getRouteKey(booking)]; const stops = saved?.stopIds ? saved.stopIds.map((id) => available.find((item) => item.id === id)).filter(Boolean).concat(available.filter((item) => !saved.stopIds.includes(item.id))) : getRecommendedOrder(available); setRouteEditor({ booking, stops, distanceKm: saved?.calculation?.distanceKm ? Number(saved.calculation.distanceKm).toFixed(1) : '', fuelEfficiency: '5' }); if (!saved?.calculation?.distanceKm) calculateCustomRoute(booking, stops); };
       const moveRouteStop = (index, direction) => { if (!routeEditor) return; const nextIndex = index + direction; if (nextIndex < 0 || nextIndex >= routeEditor.stops.length) return; const stops = [...routeEditor.stops]; [stops[index], stops[nextIndex]] = [stops[nextIndex], stops[index]]; setRouteEditor({ ...routeEditor, stops, distanceKm: '' }); calculateCustomRoute(routeEditor.booking, stops); };
 
+      const saveAppointmentTime = async (booking) => {
+        if (!appointmentTimeEditor?.date || !appointmentTimeEditor?.period) return;
+        const nextDate = appointmentTimeEditor.date;
+        const nextPeriod = appointmentTimeEditor.period;
+        const previousDate = booking.adjustedDate || '';
+        const previousPeriod = booking.adjustedPeriod || '';
+        setBookings((current) => current.map((item) => item.id === booking.id ? { ...item, adjustedDate: nextDate, adjustedPeriod: nextPeriod } : item));
+        setAppointmentTimeEditor(null);
+        try {
+          const response = await fetch(gasUrl + '?action=updateAppointmentTime&id=' + encodeURIComponent(booking.id) + '&date=' + encodeURIComponent(nextDate) + '&period=' + encodeURIComponent(nextPeriod));
+          const result = await response.json();
+          if (result.status !== 'success') throw new Error(result.message || '修改失敗');
+          setBookings((current) => current.map((item) => item.id === booking.id ? { ...item, adjustedDate: result.adjustedDate, adjustedPeriod: result.adjustedPeriod } : item));
+        } catch (error) {
+          setBookings((current) => current.map((item) => item.id === booking.id ? { ...item, adjustedDate: previousDate, adjustedPeriod: previousPeriod } : item));
+          setAppointmentTimeEditor({ id: booking.id, date: nextDate, period: nextPeriod });
+          window.alert('修改案件時間同步失敗，已還原原時間：' + error.message);
+        }
+      };
+
       const handleScheduleBooking = (booking) => {
         const vehicle = vehicleSelections[booking.id] || (booking.status === '已取消' ? '' : booking.assignedVehicle);
         const dispatchTrip = Number(tripSelections[booking.id] || getNextDispatchTrip(booking, vehicle));
@@ -818,13 +864,56 @@
           assignedVehicle: vehicle,
           dispatchTrip,
           dispatchOrigin: DISPATCH_ORIGIN,
-          suggestedRouteUrl: getSuggestedRouteUrl(b),
+          suggestedRouteUrl: getSuggestedRouteUrl({ ...b, assignedVehicle: vehicle, dispatchTrip }),
           statusTimeline: [...(b.statusTimeline || []), { status: '已排班', time: nowTime, note }]
         } : b));
         if (gasUrl) {
-          const syncUrl = gasUrl + '?action=updateStatus&id=' + encodeURIComponent(booking.id) + '&newStatus=' + encodeURIComponent('已排班') + '&note=' + encodeURIComponent(note + '；出車起點 ' + DISPATCH_ORIGIN);
+          const scheduleData = { assignedVehicle: vehicle, dispatchTrip, applicantPreferredTimeSlot: booking.preferredTimeSlot };
+          const syncUrl = gasUrl + '?action=updateStatus&id=' + encodeURIComponent(booking.id) + '&newStatus=' + encodeURIComponent('已排班') + '&note=' + encodeURIComponent(note + '；出車起點 ' + DISPATCH_ORIGIN) + '&scheduleData=' + encodeURIComponent(JSON.stringify(scheduleData));
           fetch(syncUrl, { mode: 'no-cors' }).catch(err => console.log(err));
         }
+      };
+
+      const handleConfirmQuantity = async (booking) => {
+        const declaredTotal = (booking.items || []).reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+        const quantity = Number(quantityDrafts[booking.id] ?? booking.confirmedQuantity ?? declaredTotal);
+        if (!Number.isInteger(quantity) || quantity < 0) { window.alert('請填寫 0 以上的正確整數件數。'); return; }
+        setQuantitySaving(booking.id);
+        try {
+          const response = await fetch(gasUrl + '?action=confirmQuantity&id=' + encodeURIComponent(booking.id) + '&quantity=' + quantity + '&note=' + encodeURIComponent('後台人工確認物件數量'));
+          const result = await response.json();
+          if (result.status !== 'success') throw new Error(result.message || '覆核失敗');
+          setBookings((current) => current.map((item) => item.id === booking.id ? {
+            ...item,
+            quantityReviewStatus: result.quantityReviewStatus,
+            confirmedQuantity: result.confirmedQuantity,
+            annualApprovedApplications: result.annualApprovedApplications,
+            chargeableQuantity: result.chargeableQuantity,
+            amountDue: result.amountDue
+          } : item));
+          setQuantityDrafts((current) => ({ ...current, [booking.id]: quantity }));
+          setQuantityEditing((current) => ({ ...current, [booking.id]: false }));
+        } catch (error) { window.alert('數量覆核失敗：' + error.message); }
+        finally { setQuantitySaving(''); }
+      };
+
+      const handleRetryAi = async (booking) => {
+        setAiSaving(booking.id);
+        try {
+          const response = await fetch(gasUrl + '?action=analyzeBookingPhotos&id=' + encodeURIComponent(booking.id));
+          const result = await response.json();
+          setBookings((current) => current.map((item) => item.id === booking.id ? {
+            ...item,
+            aiReview: result.aiReview ?? item.aiReview,
+            quantityReviewStatus: result.quantityReviewStatus ?? item.quantityReviewStatus,
+            confirmedQuantity: result.confirmedQuantity ?? item.confirmedQuantity,
+            annualApprovedApplications: result.annualApprovedApplications ?? item.annualApprovedApplications,
+            chargeableQuantity: result.chargeableQuantity ?? item.chargeableQuantity,
+            amountDue: result.amountDue ?? item.amountDue
+          } : item));
+          if (result.status !== 'success' && result.status !== 'retry_scheduled') throw new Error(result.message || '辨識失敗');
+        } catch (error) { window.alert('AI 重新辨識失敗：' + error.message); }
+        finally { setAiSaving(''); }
       };
 
       const handleAdminStatusChange = (booking, newStatus) => {
@@ -839,24 +928,47 @@
         handleAdminUpdateStatus(booking.id, newStatus, '後台手動變更狀態為' + newStatus);
       };
 
+      const handleCancelSchedule = (booking) => {
+        const nowTime = getMinguoTime();
+        const note = '取消原排班，案件退回待處理';
+        setBookings((current) => current.map((item) => item.id === booking.id ? {
+          ...item,
+          status: '待處理',
+          assignedVehicle: '',
+          dispatchTrip: null,
+          dispatchOrigin: '',
+          suggestedRouteUrl: '',
+          statusTimeline: [...(item.statusTimeline || []), { status: '待處理', time: nowTime, note }]
+        } : item));
+        setVehicleSelections((current) => ({ ...current, [booking.id]: '' }));
+        setTripSelections((current) => ({ ...current, [booking.id]: 1 }));
+        if (gasUrl) {
+          const syncUrl = gasUrl + '?action=updateStatus&id=' + encodeURIComponent(booking.id) + '&newStatus=' + encodeURIComponent('待處理') + '&note=' + encodeURIComponent(note);
+          fetch(syncUrl, { mode: 'no-cors' }).catch((error) => console.error('Cancel Schedule Sync Error:', error));
+        }
+      };
+
       // Sanitation Photo Upload Completion Handler (Google Drive Upload)
       const handleCompletionPhotoFileChange = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          const image = new Image();
-          image.onload = () => {
-            const scale = Math.min(1, 1600 / Math.max(image.width, image.height));
-            const canvas = document.createElement('canvas');
-            canvas.width = Math.round(image.width * scale); canvas.height = Math.round(image.height * scale);
-            canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
-            setCompletionPhotoBase64(canvas.toDataURL('image/jpeg', 0.84));
-            setCompletionPhotoName(`${completionModalBooking.id}-close-1.jpg`);
+        const availableCount = Math.max(0, 2 - completionPhotos.length);
+        const files = Array.from(e.target.files || []).filter((file) => file.type.startsWith('image/')).slice(0, availableCount);
+        if (!files.length) return;
+        Promise.all(files.map((file) => new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            const image = new Image();
+            image.onload = () => {
+              const scale = Math.min(1, 1600 / Math.max(image.width, image.height));
+              const canvas = document.createElement('canvas');
+              canvas.width = Math.round(image.width * scale); canvas.height = Math.round(image.height * scale);
+              canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+              resolve({ id: Date.now() + Math.random(), url: canvas.toDataURL('image/jpeg', 0.84), name: file.name.replace(/\.[^.]+$/, '') + '.jpg' });
+            };
+            image.src = ev.target.result;
           };
-          image.src = ev.target.result;
-        };
-        reader.readAsDataURL(file);
+          reader.readAsDataURL(file);
+        }))).then((newPhotos) => setCompletionPhotos((current) => [...current, ...newPhotos].slice(0, 2)));
+        e.target.value = '';
       };
 
 
@@ -864,6 +976,9 @@
       const handleSubmitCompletionModal = async () => {
         if (!completionModalBooking) return;
         setIsUploadingDrive(true);
+        const estimatedUploadSeconds = Math.min(15, 3 + completionPhotos.length * 4);
+        setCompletionUploadSecondsLeft(estimatedUploadSeconds);
+        const uploadCountdownTimer = setInterval(() => setCompletionUploadSecondsLeft((seconds) => Math.max(0, seconds - 1)), 1000);
 
         const bookingId = completionModalBooking.id;
         const nowTime = getMinguoTime();
@@ -889,7 +1004,8 @@
                 status: '清運完成',
                 time: nowTime,
                 note: completionNote,
-                drivePhotoUrl: completionPhotoBase64,
+                drivePhotoUrl: completionPhotos[0]?.url || '',
+                drivePhotoUrls: completionPhotos.map((photo) => photo.url),
                 ...(completionRoute || {})
               };
               return {
@@ -905,7 +1021,7 @@
         );
 
         // Upload photo to Google Drive Folder (ID: 1TYi7otNJXyEuCdZqx6cqJwNnlZXqH7dV) via GAS POST
-        if (gasUrl && completionPhotoBase64) {
+        if (gasUrl && completionPhotos.length) {
           try {
             await fetch(gasUrl, {
               method: 'POST',
@@ -914,8 +1030,7 @@
               body: JSON.stringify({
                 action: 'completeWithPhoto',
                 id: bookingId,
-                fileBase64: completionPhotoBase64,
-                fileName: `${bookingId}-close-1.jpg`,
+                files: completionPhotos.map((photo, index) => ({ fileBase64: photo.url, fileName: `${bookingId}-close-${index + 1}.jpg`, mimeType: 'image/jpeg' })),
                 note: completionNote,
                 routeData: completionRoute
               })
@@ -926,9 +1041,10 @@
         }
 
         setIsUploadingDrive(false);
+        clearInterval(uploadCountdownTimer);
+        setCompletionUploadSecondsLeft(0);
         setCompletionModalBooking(null);
-        setCompletionPhotoBase64('');
-        setCompletionPhotoName('');
+        setCompletionPhotos([]);
       };
 
       // Export CSV
@@ -954,7 +1070,97 @@
         a.click();
       };
 
-      const pendingCount = bookings.filter((b) => b.status === '已收件' || b.status === '待審核').length;
+      const isPendingStatus = (status) => ['已收件', '待審核', '待處理', '審核中'].includes(String(status || '').trim());
+      const getDisplayStatus = (status) => isPendingStatus(status) ? '待處理' : status;
+      const pendingCount = bookings.filter((b) => isPendingStatus(b.status)).length;
+      const visibleCaseBookings = bookings.filter((booking) => {
+        if (caseListView === 'completed') return booking.status === '清運完成';
+        if (caseListView === 'cancelled') return booking.status === '已取消';
+        if (caseListView === 'all') return true;
+        return booking.status !== '清運完成' && booking.status !== '已取消';
+      });
+      const dashboardNow = new Date();
+      const parseDashboardDate = (value) => {
+        const raw = String(value || '').trim();
+        if (!raw) return null;
+        const numberParts = raw.match(/\d+/g) || [];
+        const rocMatch = raw.match(/^(?:民國)?(\d{2,3})[\/\-.年](\d{1,2})[\/\-.月](\d{1,2})/);
+        if (rocMatch && Number(rocMatch[1]) < 1911) {
+          const periodOffset = raw.includes('下午') && Number(numberParts[3] || 0) < 12 ? 12 : 0;
+          const parsed = new Date(Number(rocMatch[1]) + 1911, Number(rocMatch[2]) - 1, Number(rocMatch[3]), Number(numberParts[3] || 0) + periodOffset, Number(numberParts[4] || 0));
+          return isNaN(parsed.getTime()) ? null : parsed;
+        }
+        const parsed = new Date(raw);
+        return isNaN(parsed.getTime()) ? null : parsed;
+      };
+      const dashboardBookings = bookings.filter((booking) => {
+        if (dashboardPeriod === 'all') return true;
+        const applicationDate = parseDashboardDate(booking.createdAt);
+        if (!applicationDate) return false;
+        if (dashboardPeriod === 'year') return applicationDate.getFullYear() === dashboardNow.getFullYear();
+        if (dashboardPeriod === 'month') return applicationDate.getFullYear() === dashboardNow.getFullYear() && applicationDate.getMonth() === dashboardNow.getMonth();
+        return true;
+      });
+      const makeDashboardRanking = (entries) => [...entries].sort((a, b) => b.value - a.value || a.label.localeCompare(b.label, 'zh-Hant'));
+      const dashboardStatusData = makeDashboardRanking(Object.entries(dashboardBookings.reduce((result, booking) => {
+        const label = getDisplayStatus(booking.status) || '未設定';
+        result[label] = (result[label] || 0) + 1;
+        return result;
+      }, {})).map(([label, value]) => ({ label, value })));
+      const dashboardDistrictData = makeDashboardRanking(Object.entries(dashboardBookings.reduce((result, booking) => {
+        const label = getDistrictName(booking) || '未填行政區';
+        result[label] = (result[label] || 0) + 1;
+        return result;
+      }, {})).map(([label, value]) => ({ label, value })));
+      const dashboardItemData = makeDashboardRanking(Object.entries(dashboardBookings.reduce((result, booking) => {
+        (booking.items || []).forEach((item) => { const label = item.name || '其他'; result[label] = (result[label] || 0) + Number(item.quantity || 0); });
+        return result;
+      }, {})).map(([label, value]) => ({ label, value })));
+      const dashboardConfirmedItems = dashboardBookings.reduce((sum, booking) => sum + Number(booking.confirmedQuantity || 0), 0);
+      const dashboardChargeableItems = dashboardBookings.reduce((sum, booking) => sum + Number(booking.chargeableQuantity || 0), 0);
+      const dashboardAmountDue = dashboardBookings.filter((booking) => booking.status !== '已取消').reduce((sum, booking) => sum + Number(booking.amountDue || 0), 0);
+      const dashboardCollectedAmount = dashboardBookings.filter((booking) => booking.status === '清運完成').reduce((sum, booking) => sum + Number(booking.amountDue || 0), 0);
+      const dashboardOutstandingAmount = Math.max(0, dashboardAmountDue - dashboardCollectedAmount);
+      const dashboardCompletionDistanceKm = dashboardBookings.filter((booking) => booking.status === '清運完成').reduce((sum, booking) => sum + Number(booking.completionDistanceKm || 0), 0);
+      const dashboardCompletionCarbonKg = dashboardBookings.filter((booking) => booking.status === '清運完成').reduce((sum, booking) => sum + Number(booking.completionCarbonKg || 0), 0);
+      const dashboardPending = dashboardBookings.filter((booking) => isPendingStatus(booking.status)).length;
+      const dashboardCompleted = dashboardBookings.filter((booking) => booking.status === '清運完成').length;
+      const dashboardScheduled = dashboardBookings.filter((booking) => booking.status === '已排班').length;
+      const dashboardCurrentData = dashboardView === 'district' ? dashboardDistrictData : dashboardView === 'items' ? dashboardItemData : dashboardStatusData;
+      const dashboardMaxValue = Math.max(1, ...dashboardCurrentData.map((item) => item.value));
+      const dashboardDetailConfig = {
+        collected: { title: '累計收費案件明細', rows: dashboardBookings.filter((booking) => booking.status === '清運完成') },
+        receivable: { title: '應收金額案件明細', rows: dashboardBookings.filter((booking) => booking.status !== '已取消') },
+        distance: { title: '結案里程案件明細', rows: dashboardBookings.filter((booking) => booking.status === '清運完成' && Number(booking.completionDistanceKm || 0) > 0) },
+        carbon: { title: '結案碳排量案件明細', rows: dashboardBookings.filter((booking) => booking.status === '清運完成' && Number(booking.completionCarbonKg || 0) > 0) },
+        all: { title: '全部案件明細', rows: dashboardBookings },
+        completed: { title: '完成案件明細', rows: dashboardBookings.filter((booking) => booking.status === '清運完成') },
+        confirmed: { title: '已確認物件案件明細', rows: dashboardBookings.filter((booking) => Number(booking.confirmedQuantity || 0) > 0) },
+        outstanding: { title: '尚待收取案件明細', rows: dashboardBookings.filter((booking) => booking.status !== '已取消' && booking.status !== '清運完成' && Number(booking.amountDue || 0) > 0) }
+      };
+      const dashboardDetail = dashboardDetailConfig[dashboardDetailType] || dashboardDetailConfig.all;
+      const normalizedDashboardKeyword = dashboardKeyword.trim().toLowerCase();
+      const dashboardDetailRows = dashboardDetail.rows.filter((booking) => {
+        if (!normalizedDashboardKeyword) return true;
+        const searchableText = [booking.id, booking.applicantName, booking.phone, booking.address, booking.district, getDisplayStatus(booking.status), (booking.items || []).map((item) => item.name + ' ' + item.quantity).join(' ')].join(' ').toLowerCase();
+        return searchableText.includes(normalizedDashboardKeyword);
+      });
+      const dashboardDetailTotals = dashboardDetailRows.reduce((totals, booking) => ({
+        count: totals.count + 1,
+        confirmedQuantity: totals.confirmedQuantity + Number(booking.confirmedQuantity || 0),
+        amountDue: totals.amountDue + Number(booking.amountDue || 0),
+        distanceKm: totals.distanceKm + Number(booking.completionDistanceKm || 0),
+        carbonKg: totals.carbonKg + Number(booking.completionCarbonKg || 0)
+      }), { count: 0, confirmedQuantity: 0, amountDue: 0, distanceKm: 0, carbonKg: 0 });
+      const dashboardKeywordMatchesItem = normalizedDashboardKeyword && dashboardDetailRows.some((booking) => (booking.items || []).some((item) => String(item.name || '').toLowerCase().includes(normalizedDashboardKeyword)));
+      const dashboardDetailItemTotals = makeDashboardRanking(Object.entries(dashboardDetailRows.reduce((totals, booking) => {
+        (booking.items || []).forEach((item) => {
+          const itemName = String(item.name || '其他').trim() || '其他';
+          if (dashboardKeywordMatchesItem && !itemName.toLowerCase().includes(normalizedDashboardKeyword)) return;
+          totals[itemName] = (totals[itemName] || 0) + Number(item.quantity || 0);
+        });
+        return totals;
+      }, {})).map(([label, value]) => ({ label, value })));
 
       return (
         <div className="civic-shell min-h-screen flex flex-col">
@@ -974,6 +1180,8 @@
                   </span>
                 </button>
                 <nav className="flex shrink-0 items-center gap-2" aria-label="後台導覽">
+                  <button type="button" onClick={() => setActiveTab('admin')} className={'hidden min-h-10 items-center rounded-xl px-4 text-sm font-black transition-colors md:flex ' + (activeTab === 'admin' ? 'bg-emerald-700 text-white' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50')}>案件管理</button>
+                  <button type="button" onClick={() => setActiveTab('dashboard')} className={'flex min-h-10 items-center rounded-xl px-3 text-sm font-black transition-colors sm:px-4 ' + (activeTab === 'dashboard' ? 'bg-sky-700 text-white' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50')}>📊 Dashboard</button>
                   <span className="hidden items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-bold text-amber-700 sm:flex">
                     <span>🛡️</span><span>後台管理模式</span>
                   </span>
@@ -1119,7 +1327,7 @@
                       清運項目及數量選擇
                     </h3>
                     <span className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                      已選總數: {selectedItems.reduce((acc, cur) => acc + cur.quantity, 0)} 件
+                      已選總數: {selectedItems.reduce((acc, cur) => acc + cur.quantity, 0)} 件｜每次申請前 2 件免費，超過每件 200 元；每戶每年最多 3 次免費申請
                     </span>
                   </div>
 
@@ -1371,19 +1579,11 @@
                                 <span className="font-bold">{t.status}</span> ({getMinguoTime(t.time)})
                                 {t.note && <p className="text-slate-400 text-[11px]">{t.note}</p>}
                                 {Number.isFinite(Number(t.distanceKm)) && Number.isFinite(Number(t.carbonKg)) && <p className="mt-1 text-[11px] font-bold text-emerald-400">🚚 {t.vehicle ? t.vehicle + ' 車・' : ''}{t.dispatchPeriod ? t.dispatchPeriod + '・' : ''}{t.dispatchTrip ? '第 ' + t.dispatchTrip + ' 趟・' : ''}{t.routeType || '行車路線'}・{Number(t.distanceKm).toFixed(1)} km・{Number(t.carbonKg).toFixed(2)} kg CO₂e{Number(t.durationMinutes) > 0 ? '・約 ' + Number(t.durationMinutes) + ' 分鐘' : ''}</p>}
-                                {t.drivePhotoUrl && (
+                                {(t.drivePhotoUrl || (t.drivePhotoUrls || []).length > 0) && (
                                   <div className="mt-1 space-y-1">
                                     <span className="text-amber-400 text-[11px] font-bold block">📷 清潔隊現場結案照：</span>
-                                    <div className="flex items-center space-x-2">
-                                      <img src={t.drivePhotoUrl} className="w-24 h-24 object-cover rounded border border-slate-700 shadow" />
-                                      <a
-                                        href={t.drivePhotoUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="px-3 py-1 rounded-lg bg-teal-500/20 text-teal-300 hover:bg-teal-500 hover:text-slate-950 text-xs font-bold border border-teal-500/30 transition-all inline-flex items-center space-x-1"
-                                      >
-                                        <span>🔗 在 Google Drive 開啟照片</span>
-                                      </a>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      {(t.drivePhotoUrls?.length ? t.drivePhotoUrls : [t.drivePhotoUrl]).filter(Boolean).map((photoUrl, photoIndex) => <button type="button" key={photoIndex} onClick={() => setPhotoPreview({ url: getPhotoPreviewUrl(photoUrl), title: '結案照片 ' + (photoIndex + 1) })} className="space-y-1 rounded-lg border border-teal-500/30 bg-teal-500/10 p-1 text-center text-[10px] font-bold text-teal-300"><img src={getPhotoPreviewUrl(photoUrl)} className="h-20 w-20 rounded object-cover" /><span className="block">查看照片 {photoIndex + 1}</span></button>)}
                                     </div>
                                   </div>
                                 )}
@@ -1450,7 +1650,7 @@
                         <strong className="text-2xl text-slate-100">{bookings.length}</strong>
                       </div>
                       <div className="glass-card rounded-2xl border border-white/10 p-4 shadow-sm">
-                        <span className="text-xs text-slate-400 block">待審核未排班</span>
+                        <span className="text-xs text-slate-400 block">待處理未排班</span>
                         <strong className="text-2xl text-amber-400">{pendingCount}</strong>
                       </div>
                       <div className="glass-card rounded-2xl border border-white/10 p-4 shadow-sm">
@@ -1468,12 +1668,10 @@
                       <div className="flex flex-col gap-2 border-b border-slate-200 bg-emerald-50/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                           <h3 className="text-sm font-black text-slate-800">清運案件列表</h3>
-                          <p className="mt-0.5 text-xs text-slate-500">共 {bookings.length} 筆案件，同一排班會集中排列並以框線標示</p>
+                          <p className="mt-0.5 text-xs text-slate-500">目前顯示 {visibleCaseBookings.length} 筆／共 {bookings.length} 筆案件，同一排班會集中排列並以框線標示</p>
                         </div>
-                        <div className="flex items-center gap-3 text-[11px] font-bold">
-                          <span className="flex items-center gap-1.5 text-amber-700"><i className="h-2 w-2 rounded-full bg-amber-300"></i>待處理</span>
-                          <span className="flex items-center gap-1.5 text-emerald-700"><i className="h-2 w-2 rounded-full bg-emerald-300"></i>已排班</span>
-                          <span className="flex items-center gap-1.5 text-sky-700"><i className="h-2 w-2 rounded-full bg-sky-300"></i>已完成</span>
+                        <div className="flex flex-wrap items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 text-[11px] font-bold">
+                          {[['active','進行中'],['completed','已完成'],['cancelled','已取消'],['all','全部']].map(([view, label]) => <button type="button" key={view} onClick={() => setCaseListView(view)} className={'rounded-lg px-3 py-1.5 transition-colors ' + (caseListView === view ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100')}>{label}</button>)}
                         </div>
                       </div>
 
@@ -1482,17 +1680,15 @@
                           <thead className="border-b border-slate-200 bg-slate-100 text-xs font-bold tracking-wide text-slate-600">
                             <tr>
                               <th className="w-[7%] px-2 py-3.5 text-center">標籤</th>
-                              <th className="w-[13%] px-2 py-3.5">案件單號／申請時間</th>
-                              <th className="w-[10%] px-2 py-3.5">申請人</th>
-                              <th className="w-[18%] px-2 py-3.5">清運地址</th>
-                              <th className="w-[10%] px-2 py-3.5">預約日期</th>
-                              <th className="w-[12%] px-2 py-3.5">清運品項</th>
-                              <th className="w-[17%] px-2 py-3.5">狀態／排班</th>
-                              <th className="w-[13%] px-2 py-3.5 text-right">案件操作</th>
+                              <th className="w-[18%] px-2 py-3.5"><span className="flex min-h-[3rem] flex-col justify-between"><span className="block text-xs font-bold text-slate-600">案件單號／申請時間</span><span className="block text-xs font-bold text-slate-600">申請人</span></span></th>
+                              <th className="w-[20%] px-2 py-3.5"><span className="flex min-h-[3rem] flex-col justify-between"><span className="block text-xs font-bold text-slate-600">預約日期</span><span className="block text-xs font-bold text-slate-600">清運地址</span></span></th>
+                              <th className="w-[24%] px-2 py-3.5">清運品項</th>
+                              <th className="w-[16%] px-2 py-3.5">狀態／排班</th>
+                              <th className="w-[15%] px-2 py-3.5 text-right">案件操作</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-200 text-slate-700">
-                            {[...bookings].sort((a, b) => {
+                            {[...visibleCaseBookings].sort((a, b) => {
                               const aKey = a.status === '已排班' ? getRouteKey(a) : 'ZZZ|' + a.createdAt;
                               const bKey = b.status === '已排班' ? getRouteKey(b) : 'ZZZ|' + b.createdAt;
                               return aKey.localeCompare(bKey, 'zh-Hant');
@@ -1509,23 +1705,41 @@
                                 <td className="px-2 py-4">
                                   <span className="block break-all font-mono text-[13px] font-black text-emerald-700">{b.id}</span>
                                   <span className="mt-1 block text-[11px] leading-4 text-slate-500">{getMinguoTime(b.createdAt)}</span>
+                                  <div className="mt-3 border-t border-slate-200 pt-2">
+                                    <span className="block font-bold text-slate-800">{b.applicantName}</span>
+                                    <span className="mt-0.5 block font-mono text-xs text-slate-500">{b.phone}</span>
+                                  </div>
                                 </td>
                                 <td className="px-2 py-4 break-words">
-                                  <span className="block font-bold text-slate-100">{b.applicantName}</span>
-                                  <span className="mt-1 block font-mono text-xs text-slate-400">{b.phone}</span>
-                                </td>
-                                <td className="px-2 py-4 break-words leading-5 text-slate-300">
-                                  <span className="block font-black text-slate-700">{getCountyDistrict(b)}</span>
-                                  {b.mapLink ? (
-                                    <a href={b.mapLink} target="_blank" rel="noopener noreferrer" className="mt-1 block text-sky-700 underline decoration-sky-300 underline-offset-2 transition-colors hover:text-emerald-700" title="開啟 Google Maps">{getLocalAddress(b)}</a>
-                                  ) : <span className="mt-1 block">{getLocalAddress(b)}</span>}
-                                </td>
-                                <td className="px-2 py-4 break-words">
-                                  <span className="font-bold text-slate-100">{formatMinguoDate(b.preferredDate)}</span>
-                                  <span className="mt-1 block text-xs text-slate-400">{b.preferredTimeSlot?.split(' ')[0]}</span>
+                                  <span className="block text-[10px] font-black text-slate-500">{b.adjustedDate || b.adjustedPeriod ? '調整後清運時間' : '民眾預約時間'}</span>
+                                  <span className="font-bold text-slate-800">{formatMinguoDate(getDispatchDate(b))}</span>
+                                  <span className="mt-1 block text-xs text-emerald-700">{getDispatchPeriod(b)}</span>
+                                  {(b.adjustedDate || b.adjustedPeriod) && <span className="mt-1 block text-[10px] text-slate-400">原預約：{formatMinguoDate(b.preferredDate)} {b.preferredTimeSlot?.split(' ')[0]}</span>}
+                                  {appointmentTimeEditor?.id === b.id ? <div className="mt-2 space-y-1 rounded-lg border border-violet-200 bg-violet-50 p-2"><input type="date" value={appointmentTimeEditor.date} onChange={(e) => setAppointmentTimeEditor((current) => ({ ...current, date: e.target.value }))} className="w-full rounded border border-violet-200 bg-white px-2 py-1 text-xs text-slate-800" /><select value={appointmentTimeEditor.period} onChange={(e) => setAppointmentTimeEditor((current) => ({ ...current, period: e.target.value }))} className="w-full rounded border border-violet-200 bg-white px-2 py-1 text-xs text-slate-800"><option value="上午">上午</option><option value="下午">下午</option></select><div className="flex gap-1"><button type="button" onClick={() => saveAppointmentTime(b)} className="flex-1 rounded bg-violet-600 px-2 py-1 text-[10px] font-black text-white">確認修改</button><button type="button" onClick={() => setAppointmentTimeEditor(null)} className="rounded bg-slate-200 px-2 py-1 text-[10px] font-bold text-slate-700">取消</button></div></div> : <button type="button" onClick={() => setAppointmentTimeEditor({ id: b.id, date: getDispatchDate(b), period: getDispatchPeriod(b) === '下午' ? '下午' : '上午' })} className="mt-2 rounded-lg border border-violet-300 bg-violet-50 px-2 py-1 text-[10px] font-black text-violet-700 hover:bg-violet-100">修改案件時間</button>}
+                                  <div className="mt-3 border-t border-slate-200 pt-2 leading-5">
+                                    <span className="block font-black text-slate-700">{getCountyDistrict(b)}</span>
+                                    {b.mapLink ? (
+                                      <a href={b.mapLink} target="_blank" rel="noopener noreferrer" className="mt-1 block text-sky-700 underline decoration-sky-300 underline-offset-2 transition-colors hover:text-emerald-700" title="開啟 Google Maps">{getLocalAddress(b)}</a>
+                                    ) : <span className="mt-1 block text-slate-700">{getLocalAddress(b)}</span>}
+                                  </div>
                                 </td>
                                 <td className="px-2 py-4 break-words leading-6 text-slate-300">
-                                  {b.itemsChinese || b.items?.map(i => i.name + ' × ' + i.quantity).join('、')}
+                                  <div>{b.itemsChinese || b.items?.map(i => i.name + ' × ' + i.quantity).join('、')}</div>
+                                  <div className="mt-2 flex flex-wrap gap-1">
+                                    {(b.photos || []).length > 0 ? (b.photos || []).map((photoUrl, photoIndex) => (
+                                      <button type="button" key={photoIndex} onClick={() => setPhotoPreview({ url: getPhotoPreviewUrl(photoUrl), title: b.id + ' 申請照片 ' + (photoIndex + 1) })} className="inline-flex items-center rounded-md border border-sky-200 bg-sky-50 px-2 py-1 text-[10px] font-black text-sky-700 transition-colors hover:bg-sky-600 hover:text-white" title={'查看 ' + b.id + ' 第 ' + (photoIndex + 1) + ' 張申請照片'}>📷 申請照片 {photoIndex + 1}</button>
+                                    )) : <span className="text-[10px] font-bold text-slate-500">尚未上傳申請照片</span>}
+                                  </div>
+                                  <div className={'mt-2 rounded-lg border p-2 text-[10px] leading-4 ' + ((b.quantityReviewStatus === '人工已核可' && !quantityEditing[b.id]) || String(b.quantityReviewStatus || '').startsWith('AI數量吻合') ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800')}>
+                                    <strong className="block">{b.quantityReviewStatus === '人工已核可' && quantityEditing[b.id] ? '⚠ 修改中，請重新確認' : b.quantityReviewStatus === '人工已核可' ? '☑ 已人工核可' : String(b.quantityReviewStatus || '').startsWith('AI數量吻合') ? '☑ Gemini 數量吻合' : '⚠ ' + (b.quantityReviewStatus || '等待 Gemini 辨識')}</strong>
+                                    {b.aiReview && <span className="block">AI：{b.aiReview.error || b.aiReview.items?.map(i => i.name + ' × ' + i.quantity).join('、') || (b.aiReview.totalQuantity != null ? b.aiReview.totalQuantity + ' 件' : '尚無結果')}{b.aiReview.note ? '；' + b.aiReview.note : ''}</span>}
+                                    <label className="mt-1 block font-bold">正確總件數 {b.quantityReviewStatus === '人工已核可' && !quantityEditing[b.id] && <span className="text-slate-500">🔒 已鎖定</span>}
+                                      <input type="number" min="0" step="1" disabled={b.quantityReviewStatus === '人工已核可' && !quantityEditing[b.id]} value={quantityDrafts[b.id] ?? b.confirmedQuantity ?? (b.items || []).reduce((sum, item) => sum + Number(item.quantity || 0), 0)} onChange={(e) => setQuantityDrafts((current) => ({ ...current, [b.id]: e.target.value }))} className="ml-1 w-14 rounded border border-slate-300 bg-white px-1 py-0.5 text-center text-slate-800 shadow-sm transition-colors disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-300 disabled:font-black disabled:text-slate-500 disabled:opacity-70 disabled:shadow-inner" />
+                                      <button onClick={() => b.quantityReviewStatus === '人工已核可' && !quantityEditing[b.id] ? setQuantityEditing((current) => ({ ...current, [b.id]: true })) : handleConfirmQuantity(b)} disabled={quantitySaving === b.id} className="ml-1 rounded bg-emerald-600 px-2 py-1 font-black text-white disabled:opacity-50">{quantitySaving === b.id ? '儲存中' : b.quantityReviewStatus === '人工已核可' && !quantityEditing[b.id] ? '修改' : '確認'}</button>
+                                    </label>
+                                    {(!b.quantityReviewStatus || String(b.quantityReviewStatus).includes('失敗') || String(b.quantityReviewStatus).includes('忙碌') || b.quantityReviewStatus === '待辨識') && <button onClick={() => handleRetryAi(b)} disabled={aiSaving === b.id || !(b.photos || []).length} className="mt-1 rounded border border-amber-400 bg-white px-2 py-1 font-black text-amber-800 disabled:opacity-50">{aiSaving === b.id ? 'AI 辨識中…' : String(b.quantityReviewStatus || '').includes('失敗') || String(b.quantityReviewStatus || '').includes('忙碌') ? '↻ 重新執行 AI 辨識' : '✨ 執行 AI 照片辨識'}</button>}
+                                    <span className="mt-1 block">本戶本年度已核可 {Number(b.annualApprovedApplications || 0)} 次；本次計費 {Number(b.chargeableQuantity || 0)} 件 × 200 元＝<strong>{Number(b.amountDue || 0).toLocaleString()} 元</strong></span>
+                                  </div>
                                 </td>
                                 {(!groupKey || isGroupStart) && <td rowSpan={groupKey ? groupBookings.length : 1} className={groupKey ? 'border-b-2 border-b-emerald-400 bg-emerald-50/50 px-2 py-4 align-top' : 'px-2 py-4 align-top'}>
                                   <span className={'inline-flex whitespace-nowrap rounded-lg border px-2 py-1 text-xs font-black ' + (
@@ -1533,12 +1747,12 @@
                                     b.status === '清運完成' ? 'border-sky-400/25 bg-sky-400/10 text-sky-300' :
                                     b.status === '已取消' ? 'border-rose-400/25 bg-rose-400/10 text-rose-300' :
                                     'border-amber-400/25 bg-amber-400/10 text-amber-300'
-                                  )} aria-label={b.id + ' 目前狀態：' + b.status}>{b.status}</span>
+                                  )} aria-label={b.id + ' 目前狀態：' + getDisplayStatus(b.status)}>{getDisplayStatus(b.status)}</span>
                                   {b.status === '已排班' && <><strong className="mt-2 block text-xs font-black leading-5 text-sky-700">{getDispatchLabel(b)}</strong><a href={getSuggestedRouteUrl(b)} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex rounded-lg border border-amber-300 bg-amber-100 px-2 py-1.5 text-[11px] font-black text-amber-800 transition-colors hover:bg-amber-300">✨ 最佳路線（{groupBookings.length}點）</a><div className="mt-2"><span className="block text-[10px] font-bold leading-4 text-slate-500">里程／碳排量</span><span className="mt-0.5 block text-[10px] font-black leading-4 text-emerald-700">{getRouteCarbon(b)}</span></div>{groupBookings.length > 1 && <div className="mt-3 border-t border-emerald-200 pt-2"><button onClick={() => openRouteEditor(b)} className="rounded-lg border border-violet-300 bg-violet-100 px-2 py-1.5 text-[11px] font-black text-violet-800 hover:bg-violet-300">↕ 自訂路線</button><span className="mt-2 block text-[10px] font-bold leading-4 text-slate-500">里程／碳排量</span><span className="mt-0.5 block text-[10px] font-black leading-4 text-violet-700">{getCustomRouteCarbon(b)}</span></div>}</>}
                                 </td>}
                                 <td className="bg-white px-2 py-4 align-top">
                                   <div className="flex w-full flex-col gap-2">
-                                    {(b.status === '已收件' || b.status === '待審核' || b.status === '已取消') && (
+                                    {isPendingStatus(b.status) && (
                                       <div className="flex w-full flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2">
                                         <span className="text-[10px] font-black text-slate-500">車輛排班</span>
                                         <select value={vehicleSelections[b.id] || (b.status === '已取消' ? '' : b.assignedVehicle) || ''} onChange={(e) => { const vehicle = e.target.value; setVehicleSelections((prev) => ({ ...prev, [b.id]: vehicle })); setTripSelections((prev) => ({ ...prev, [b.id]: vehicle ? getNextDispatchTrip(b, vehicle) : 1 })); }} className="w-full rounded-lg border border-slate-300 bg-white px-2 py-2 text-xs font-bold text-slate-700" aria-label={'選擇 ' + b.id + ' 的資源回收車'}>
@@ -1551,17 +1765,17 @@
                                       </div>
                                     )}
                                     {b.status === '已排班' && (
-                                      <div className="flex w-full flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2"><span className="text-center text-[10px] font-black text-slate-500">此案件</span><button onClick={() => setCompletionModalBooking(b)} className="w-full rounded-lg bg-emerald-500 px-2 py-2 text-xs font-black text-white transition-colors hover:bg-emerald-600">📸 拍照結案</button><button onClick={() => { if (window.confirm('確定取消案件「' + b.id + '」目前的排班？取消後可重新選擇車輛排班。')) handleAdminStatusChange(b, '已取消'); }} className="w-full rounded-lg border border-rose-300 bg-white px-2 py-2 text-xs font-black text-rose-600 transition-colors hover:bg-rose-500 hover:text-white">取消排班</button></div>
-                                    )}
-                                    {b.status !== '已排班' && b.status !== '清運完成' && b.status !== '已取消' && (
-                                      <button onClick={() => setCompletionModalBooking(b)} className="w-full rounded-lg bg-emerald-500 px-3 py-2 text-xs font-black text-white shadow-sm transition-colors hover:bg-emerald-600">📸 拍照結案</button>
+                                      <div className="flex w-full flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2"><span className="text-center text-[10px] font-black text-slate-500">此案件</span><button onClick={() => setCompletionModalBooking(b)} className="w-full rounded-lg border border-sky-700 bg-sky-600 px-2 py-2 text-xs font-black text-white shadow-sm transition-colors hover:bg-sky-700">📸 拍照結案</button><button onClick={() => { if (window.confirm('確定取消案件「' + b.id + '」目前的排班？案件將退回待處理並可重新排班。')) handleCancelSchedule(b); }} className="w-full rounded-lg border border-rose-300 bg-white px-2 py-2 text-xs font-black text-rose-600 transition-colors hover:bg-rose-500 hover:text-white">取消排班</button></div>
                                     )}
                                     {b.status === '清運完成' && (() => {
-                                      const completedItem = b.statusTimeline?.slice().reverse().find(t => t.status === '清運完成' && t.drivePhotoUrl);
-                                      return completedItem?.drivePhotoUrl ? (
-                                        <a href={completedItem.drivePhotoUrl} target="_blank" rel="noopener noreferrer" className="w-full rounded-lg border border-sky-300 bg-sky-50 px-3 py-2 text-center text-xs font-bold text-sky-700 transition-colors hover:bg-sky-500 hover:text-white">📷 查看結案照片</a>
+                                      const completedItem = b.statusTimeline?.slice().reverse().find(t => t.status === '清運完成' && (t.drivePhotoUrl || (t.drivePhotoUrls || []).length));
+                                      const completedPhotoUrls = completedItem ? (completedItem.drivePhotoUrls?.length ? completedItem.drivePhotoUrls : [completedItem.drivePhotoUrl]).filter(Boolean) : [];
+                                      return completedPhotoUrls.length ? (
+                                        <span className="flex w-full flex-col gap-1">{completedPhotoUrls.map((photoUrl, photoIndex) => <button type="button" key={photoIndex} onClick={() => setPhotoPreview({ url: getPhotoPreviewUrl(photoUrl), title: b.id + ' 結案照片 ' + (photoIndex + 1) })} className="w-full rounded-lg border border-sky-300 bg-sky-50 px-3 py-2 text-center text-xs font-bold text-sky-700 transition-colors hover:bg-sky-500 hover:text-white">📷 查看結案照片 {photoIndex + 1}</button>)}</span>
                                       ) : <span className="w-full rounded-lg bg-slate-100 px-2 py-2 text-center text-xs font-bold text-slate-500">已結案</span>;
                                     })()}
+                                    {b.status === '清運完成' && <button type="button" onClick={() => { if (window.confirm('確定取消已完成案件「' + b.id + '」？結案照片與歷程仍會保留。')) handleAdminUpdateStatus(b.id, '已取消', '清運完成案件由後台取消'); }} className="w-full rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-xs font-black text-rose-700 transition-colors hover:bg-rose-600 hover:text-white">取消案件</button>}
+                                    {b.status === '已取消' && <span className="w-full rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-center text-xs font-black text-rose-700">案件已取消</span>}
                                   </div>
                                 </td>
                               </tr>
@@ -1575,12 +1789,67 @@
               </div>
             )}
 
+            {/* TAB 4: Google Sheet Dashboard */}
+            {activeTab === 'dashboard' && (
+              !isAdminAuth ? (
+                <div className="mx-auto mt-20 max-w-md rounded-3xl border border-slate-700 bg-slate-900/90 p-8 text-center shadow-2xl">
+                  <div className="text-4xl">🔒</div><h2 className="mt-4 text-xl font-black text-white">請先登入後台</h2><p className="mt-2 text-xs text-slate-400">Dashboard 使用 Google Sheet 案件資料，僅供後台人員查看。</p>
+                  <button type="button" onClick={() => setActiveTab('admin')} className="mt-6 rounded-xl bg-emerald-500 px-6 py-3 text-sm font-black text-slate-950">前往登入</button>
+                </div>
+              ) : (
+                <div className="mx-auto max-w-7xl space-y-5">
+                  <div className="flex flex-col gap-4 rounded-3xl border border-sky-200 bg-gradient-to-br from-white to-sky-50 p-5 shadow-lg sm:p-7 lg:flex-row lg:items-end lg:justify-between">
+                    <div><span className="text-xs font-black tracking-widest text-sky-700">GOOGLE SHEET 即時統計</span><h2 className="mt-1 text-2xl font-black text-slate-900 sm:text-3xl">清運案件 Dashboard</h2><p className="mt-2 text-xs text-slate-500">依案件申請時間統計目前同步的 {bookings.length} 筆資料；Google Sheet 每 60 秒自動更新一次。</p></div>
+                    <div className="flex flex-wrap gap-2">
+                      {[['all','全部期間'],['year','今年'],['month','本月']].map(([value, label]) => <button type="button" key={value} onClick={() => setDashboardPeriod(value)} className={'rounded-xl px-4 py-2 text-xs font-black transition-colors ' + (dashboardPeriod === value ? 'bg-sky-700 text-white' : 'border border-slate-200 bg-white text-slate-600')}>{label}</button>)}
+                      <button type="button" onClick={fetchFromGoogleSheets} disabled={isSyncingGas} className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-black text-white disabled:opacity-50">{isSyncingGas ? '同步中…' : '↻ 立即同步'}</button>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    <button type="button" onClick={() => setDashboardDetailType('collected')} className={'rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ' + (dashboardDetailType === 'collected' ? 'ring-2 ring-emerald-500' : '')}><span className="text-xs font-bold text-emerald-800">累計收費</span><strong className="mt-2 block text-3xl font-black text-emerald-950">NT$ {dashboardCollectedAmount.toLocaleString()}</strong><span className="mt-2 block text-[11px] text-emerald-700">已完成案件的計費金額合計・點擊查看明細</span></button>
+                    <button type="button" onClick={() => setDashboardDetailType('receivable')} className={'rounded-2xl border border-rose-200 bg-rose-50 p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ' + (dashboardDetailType === 'receivable' ? 'ring-2 ring-rose-500' : '')}><span className="text-xs font-bold text-rose-800">應收金額</span><strong className="mt-2 block text-3xl font-black text-rose-950">NT$ {dashboardAmountDue.toLocaleString()}</strong><span className="mt-2 block text-[11px] text-rose-700">全部未取消案件應收合計・點擊查看明細</span></button>
+                    <button type="button" onClick={() => setDashboardDetailType('distance')} className={'rounded-2xl border border-sky-200 bg-sky-50 p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ' + (dashboardDetailType === 'distance' ? 'ring-2 ring-sky-500' : '')}><span className="text-xs font-bold text-sky-800">結案里程</span><strong className="mt-2 block text-3xl font-black text-sky-950">{dashboardCompletionDistanceKm.toLocaleString(undefined, { maximumFractionDigits: 1 })} km</strong><span className="mt-2 block text-[11px] text-sky-700">清運完成案件里程合計・點擊查看明細</span></button>
+                    <button type="button" onClick={() => setDashboardDetailType('carbon')} className={'rounded-2xl border border-violet-200 bg-violet-50 p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ' + (dashboardDetailType === 'carbon' ? 'ring-2 ring-violet-500' : '')}><span className="text-xs font-bold text-violet-800">結案碳排量</span><strong className="mt-2 block text-3xl font-black text-violet-950">{dashboardCompletionCarbonKg.toLocaleString(undefined, { maximumFractionDigits: 2 })}</strong><span className="mt-1 block text-xs font-black text-violet-800">kgCO₂e・點擊查看明細</span></button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                    {[['all','案件總數', dashboardBookings.length, '筆', 'text-slate-900'],['completed','完成案件', dashboardCompleted, '筆', 'text-sky-700'],['confirmed','確認物件', dashboardConfirmedItems, '件', 'text-emerald-700'],['outstanding','尚待收取', dashboardOutstandingAmount, '元', 'text-amber-700']].map(([type, label, value, unit, color]) => <button type="button" onClick={() => setDashboardDetailType(type)} key={label} className={'rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition-colors hover:bg-slate-50 ' + (dashboardDetailType === type ? 'ring-2 ring-slate-400' : '')}><span className="block text-xs font-bold text-slate-500">{label}</span><strong className={'mt-1 block text-2xl font-black ' + color}>{Number(value).toLocaleString()} <small className="text-xs">{unit}</small></strong><span className="mt-1 block text-[10px] font-bold text-slate-400">查看詳細資料</span></button>)}
+                  </div>
+
+                  <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-lg">
+                    <div className="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4 lg:flex-row lg:items-center lg:justify-between"><div><h3 className="font-black text-slate-900">{dashboardDetail.title}</h3><p className="mt-1 text-xs text-slate-500">顯示 {dashboardDetailRows.length} 筆／分類共 {dashboardDetail.rows.length} 筆，依目前期間與關鍵字篩選</p></div><div className="flex w-full gap-2 lg:w-auto"><label className="relative min-w-0 flex-1 lg:w-80"><span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400">⌕</span><input type="search" value={dashboardKeyword} onChange={(event) => setDashboardKeyword(event.target.value)} placeholder="搜尋單號、姓名、電話、地址、狀態、品項" className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-xs font-bold text-slate-800 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100" /></label>{dashboardKeyword && <button type="button" onClick={() => setDashboardKeyword('')} className="shrink-0 rounded-xl border border-slate-300 bg-white px-3 text-xs font-black text-slate-600 hover:bg-slate-100">清除</button>}</div></div>
+                    <div className="max-h-[520px] overflow-auto"><table className="min-w-[1220px] w-full text-left text-xs"><thead className="sticky top-0 bg-slate-100 text-slate-600"><tr><th className="px-4 py-3">案件單號／日期</th><th className="px-4 py-3">申請人／地址</th><th className="px-4 py-3">清運品項（中文名稱／數量）</th><th className="px-4 py-3">狀態</th><th className="px-4 py-3 text-right">確認件數</th><th className="px-4 py-3 text-right">應收金額</th><th className="px-4 py-3 text-right">結案里程</th><th className="px-4 py-3 text-right">結案碳排量</th></tr></thead><tbody className="divide-y divide-slate-100">{dashboardDetailRows.length ? dashboardDetailRows.map((booking) => <tr key={booking.id} className="hover:bg-sky-50/60"><td className="px-4 py-3"><strong className="block font-mono text-emerald-700">{booking.id}</strong><span className="text-slate-500">{formatMinguoDate(getDispatchDate(booking))}</span></td><td className="px-4 py-3"><strong className="block text-slate-800">{booking.applicantName || '未填寫'}</strong><span className="block max-w-xs truncate text-slate-500" title={booking.address}>{booking.address || '未填寫'}</span></td><td className="px-4 py-3"><div className="flex max-w-xs flex-wrap gap-1">{(booking.items || []).length ? (booking.items || []).map((item, itemIndex) => <span key={itemIndex} className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 font-bold text-amber-800">{item.name || '其他'} × {Number(item.quantity || 0)}</span>) : <span className="text-slate-400">未填寫品項</span>}</div></td><td className="px-4 py-3 font-bold text-slate-700">{getDisplayStatus(booking.status)}</td><td className="px-4 py-3 text-right font-black text-slate-800">{Number(booking.confirmedQuantity || 0)} 件</td><td className="px-4 py-3 text-right font-black text-rose-700">NT$ {Number(booking.amountDue || 0).toLocaleString()}</td><td className="px-4 py-3 text-right font-bold text-sky-700">{Number(booking.completionDistanceKm || 0).toLocaleString(undefined, { maximumFractionDigits: 1 })} km</td><td className="px-4 py-3 text-right font-bold text-violet-700">{Number(booking.completionCarbonKg || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })} kgCO₂e</td></tr>) : <tr><td colSpan="8" className="px-4 py-12 text-center font-bold text-slate-400">{dashboardKeyword ? '找不到符合關鍵字的資料' : '此分類目前沒有資料'}</td></tr>}</tbody><tfoot className="sticky bottom-0 border-t-2 border-slate-300 bg-slate-900 text-white shadow-[0_-8px_20px_-16px_rgba(15,23,42,.8)]"><tr><td className="px-4 py-3 font-black">目前篩選合計</td><td className="px-4 py-3 font-bold text-slate-300">共 {dashboardDetailTotals.count.toLocaleString()} 筆</td><td className="px-4 py-3 text-slate-400">—</td><td className="px-4 py-3 text-slate-400">—</td><td className="px-4 py-3 text-right font-black text-emerald-300">{dashboardDetailTotals.confirmedQuantity.toLocaleString()} 件</td><td className="px-4 py-3 text-right font-black text-rose-300">NT$ {dashboardDetailTotals.amountDue.toLocaleString()}</td><td className="px-4 py-3 text-right font-black text-sky-300">{dashboardDetailTotals.distanceKm.toLocaleString(undefined, { maximumFractionDigits: 1 })} km</td><td className="px-4 py-3 text-right font-black text-violet-300">{dashboardDetailTotals.carbonKg.toLocaleString(undefined, { maximumFractionDigits: 2 })} kgCO₂e</td></tr><tr className="border-t border-slate-700 bg-slate-800"><td className="px-4 py-3 font-black text-amber-300">{dashboardKeywordMatchesItem ? '關鍵字品項合計' : '品項分類統計'}</td><td colSpan="7" className="px-4 py-3"><div className="flex flex-wrap gap-2">{dashboardDetailItemTotals.length ? dashboardDetailItemTotals.map((item) => <span key={item.label} className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-2.5 py-1 font-black text-amber-200">{item.label}：{item.value.toLocaleString()} 件</span>) : <span className="text-slate-400">目前沒有品項資料</span>}</div></td></tr></tfoot></table></div>
+                  </div>
+
+                  <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-lg sm:p-7">
+                    <div className="flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between"><div><h3 className="text-lg font-black text-slate-900">資訊分析</h3><p className="text-xs text-slate-500">切換想查看的 Google Sheet 重要資訊</p></div><div className="flex flex-wrap gap-2">{[['status','案件狀態'],['district','行政區'],['items','清運品項']].map(([value,label]) => <button type="button" key={value} onClick={() => setDashboardView(value)} className={'rounded-xl px-4 py-2 text-xs font-black ' + (dashboardView === value ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600')}>{label}</button>)}</div></div>
+                    <div className="mt-5 space-y-4">{dashboardCurrentData.length ? dashboardCurrentData.slice(0, 12).map((item, index) => <div key={item.label}><div className="mb-1 flex items-center justify-between gap-3 text-xs"><span className="font-bold text-slate-700">{index + 1}. {item.label}</span><strong className="text-slate-900">{item.value.toLocaleString()} {dashboardView === 'items' ? '件' : '筆'}</strong></div><div className="h-3 overflow-hidden rounded-full bg-slate-100"><div className={'h-full rounded-full ' + (dashboardView === 'district' ? 'bg-emerald-500' : dashboardView === 'items' ? 'bg-amber-500' : 'bg-sky-500')} style={{ width: Math.max(4, item.value / dashboardMaxValue * 100) + '%' }} /></div></div>) : <div className="py-14 text-center text-sm font-bold text-slate-400">此期間尚無資料</div>}</div>
+                  </div>
+                </div>
+              )
+            )}
+
           </main>
+
+          {photoPreview && (
+            <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-sm" onClick={() => setPhotoPreview(null)}>
+              <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+                <div className="mb-3 flex items-center justify-between border-b border-slate-200 pb-3">
+                  <h3 className="text-base font-black text-slate-900">📷 {photoPreview.title}</h3>
+                  <button type="button" onClick={() => setPhotoPreview(null)} className="rounded-lg bg-slate-100 px-3 py-1.5 font-black text-slate-700 hover:bg-slate-200">✕</button>
+                </div>
+                <div className="flex min-h-48 items-center justify-center overflow-hidden rounded-xl bg-slate-100">
+                  <img src={photoPreview.url} alt={photoPreview.title} className="max-h-[70vh] w-auto max-w-full object-contain" />
+                </div>
+              </div>
+            </div>
+          )}
 
           {routeEditor && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
               <div className="w-full max-w-2xl rounded-3xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
-                <div className="mb-4 flex items-start justify-between"><div><h3 className="text-lg font-black text-white">↕ 自訂 {getDispatchLabel(routeEditor.booking)}路線</h3><p className="mt-1 text-xs text-slate-400">{formatMinguoDate(routeEditor.booking.preferredDate)}・起點固定為出車地址</p></div><button onClick={() => setRouteEditor(null)} className="text-lg font-bold text-slate-400">✕</button></div>
+                <div className="mb-4 flex items-start justify-between"><div><h3 className="text-lg font-black text-white">↕ 自訂 {getDispatchLabel(routeEditor.booking)}路線</h3><p className="mt-1 text-xs text-slate-400">{formatMinguoDate(getDispatchDate(routeEditor.booking))}・起點固定為出車地址</p></div><button onClick={() => setRouteEditor(null)} className="text-lg font-bold text-slate-400">✕</button></div>
                 <div className="max-h-[55vh] space-y-2 overflow-y-auto">
                   {routeEditor.stops.map((stop, index) => <div key={stop.id} className="flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-800 p-3"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-400 font-black text-slate-950">{index + 1}</span><div className="min-w-0 flex-1"><strong className="text-sm text-white">{stop.applicantName}</strong><p className="truncate text-xs text-slate-400">{stop.address}</p></div><button onClick={() => moveRouteStop(index, -1)} disabled={index === 0} className="rounded-lg bg-slate-700 px-3 py-2 font-bold text-white disabled:opacity-30">↑</button><button onClick={() => moveRouteStop(index, 1)} disabled={index === routeEditor.stops.length - 1} className="rounded-lg bg-slate-700 px-3 py-2 font-bold text-white disabled:opacity-30">↓</button></div>)}
                 </div>
@@ -1593,15 +1862,15 @@
           {/* Modal: Sanitation Worker Completion Photo Upload Modal */}
           {completionModalBooking && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md">
-              <div className="w-full max-w-lg bg-slate-900 rounded-3xl border border-teal-500/40 p-6 space-y-4">
-                <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-                  <h3 className="text-lg font-black text-white flex items-center">
+              <div className="w-full max-w-lg space-y-4 rounded-3xl border border-sky-300 bg-white p-6 text-slate-950 shadow-2xl">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                  <h3 className="flex items-center text-lg font-black text-black">
                     <span className="mr-2">📸</span> 清潔隊現場清運完畢拍照上傳結案
                   </h3>
-                  <button onClick={() => setCompletionModalBooking(null)} className="text-slate-400 font-bold">✕</button>
+                  <button onClick={() => setCompletionModalBooking(null)} className="font-bold text-slate-700 hover:text-black">✕</button>
                 </div>
 
-                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs space-y-1">
+                <div className="space-y-1 rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs text-black">
                   <p><strong>單號：</strong><span className="text-emerald-400 font-mono font-bold">{completionModalBooking.id}</span></p>
                   <p><strong>申請人：</strong>{completionModalBooking.applicantName} ({completionModalBooking.phone})</p>
                   <p><strong>一樓放置地點：</strong>{completionModalBooking.address}</p>
@@ -1609,36 +1878,33 @@
 
                 <div className="space-y-3 text-xs">
                   <div>
-                    <label className="block font-bold text-slate-200 mb-1">
-                      上傳現場清運完畢照 (上傳至 Google Drive: <code>1TYi7otNJXyEuCdZqx6cqJwNnlZXqH7dV</code>) <span className="text-rose-400">*</span>
+                    <label className="mb-2 block font-bold text-black">
+                      上傳現場清運完畢照片 <span className="text-rose-400">*</span>
                     </label>
-                    
-                    <div className="border-2 border-dashed border-slate-700 rounded-xl p-4 text-center bg-slate-950 cursor-pointer hover:border-teal-500">
-                      <input type="file" accept="image/*" capture="environment" onChange={handleCompletionPhotoFileChange} className="hidden" id="completion-photo-file" />
-                      <label htmlFor="completion-photo-file" className="cursor-pointer block space-y-1">
-                        <div className="text-2xl">📷</div>
-                        <p className="font-bold text-slate-200">拍照或選擇照片檔案</p>
-                        <p className="text-[11px] text-slate-400">支援相機拍照或選擇手機/電腦檔案</p>
-                      </label>
+                    <input type="file" accept="image/*" capture="environment" multiple onChange={handleCompletionPhotoFileChange} className="hidden" id="completion-photo-file" />
+                    <div className="grid grid-cols-2 gap-3 pt-1 sm:grid-cols-4">
+                      {completionPhotos.map((photo, index) => (
+                        <div key={photo.id} className="relative overflow-hidden rounded-xl border border-slate-300 bg-white">
+                          <img src={photo.url} className="h-24 w-full object-cover" alt={'現場清運完畢照片 ' + (index + 1)} />
+                          <button type="button" onClick={() => setCompletionPhotos((current) => current.filter((item) => item.id !== photo.id))} className="absolute right-1 top-1 rounded-full bg-slate-950/80 p-1 text-rose-400">✕</button>
+                          <span className="block truncate bg-slate-100 p-1 text-[10px] text-black">{photo.name}</span>
+                        </div>
+                      ))}
+                      {completionPhotos.length < 2 && <label htmlFor="completion-photo-file" className="flex h-24 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-emerald-400 bg-emerald-50 transition-all hover:bg-emerald-100">
+                        <span className="text-xl">📷</span>
+                        <span className="text-xs font-bold text-black">上傳照片</span>
+                        <span className="text-[10px] text-slate-700">最多 2 張，可拍照或選擇檔案</span>
+                      </label>}
                     </div>
                   </div>
 
-
-
-                  {completionPhotoBase64 && (
-                    <div className="relative rounded-xl overflow-hidden bg-slate-950 border border-slate-700 p-2">
-                      <img src={completionPhotoBase64} className="w-full h-36 object-cover rounded-lg" />
-                      <span className="block text-[11px] text-slate-300 mt-1 truncate">{completionPhotoName || '現場拍照.jpg'}</span>
-                    </div>
-                  )}
-
                   <div>
-                    <label className="block font-bold text-slate-200 mb-1">結案備註說明</label>
+                    <label className="mb-1 block font-bold text-black">結案備註說明</label>
                     <textarea
                       rows={2}
                       value={completionNote}
                       onChange={(e) => setCompletionNote(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none focus:border-emerald-500"
+                      className="w-full rounded-xl border border-slate-300 bg-slate-50 p-2.5 text-xs text-black focus:border-emerald-500 focus:bg-white focus:outline-none"
                     />
                   </div>
                 </div>
@@ -1646,16 +1912,16 @@
                 <div className="flex justify-end space-x-3 pt-2">
                   <button
                     onClick={() => setCompletionModalBooking(null)}
-                    className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs"
+                    className="rounded-xl border border-slate-300 bg-slate-100 px-4 py-2 text-xs font-bold text-black hover:bg-slate-200"
                   >
                     取消
                   </button>
                   <button
                     onClick={handleSubmitCompletionModal}
-                    disabled={isUploadingDrive || !completionPhotoBase64}
+                    disabled={isUploadingDrive || !completionPhotos.length}
                     className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 text-slate-950 font-black text-xs shadow-lg disabled:opacity-40"
                   >
-                    {isUploadingDrive ? '☁️ 上傳 Google Drive 中...' : '✅ 上傳至 Google Drive 並完成結案'}
+                    {isUploadingDrive ? `☁️ 上傳處理中${completionUploadSecondsLeft > 0 ? `，預估還有 ${completionUploadSecondsLeft} 秒` : '…'}` : '✅ 上傳至 Google Drive 並完成結案'}
                   </button>
                 </div>
 
