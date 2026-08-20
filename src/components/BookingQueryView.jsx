@@ -1,5 +1,5 @@
 export default function BookingQueryView(props) {
-  const { activeTab, formatMinguoDate, setPrintableBooking, searchQuery, setSearchQuery, searchResults, hasSearched, handleSearchSubmit } = props;
+  const { activeTab, formatMinguoDate, getMinguoTime, setPrintableBooking, searchQuery, setSearchQuery, searchResults, hasSearched, handleSearchSubmit } = props;
 
   return (
     <>
@@ -46,7 +46,7 @@ export default function BookingQueryView(props) {
 
                         <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2">
                           <div><span className="text-slate-400">申請人：</span><strong>{b.applicantName} ({b.phone})</strong></div>
-                          <div><span className="text-slate-400">約定日期：</span><strong>{formatMinguoDate(b.preferredDate)} ({b.preferredTimeSlot.split(' ')[0]})</strong></div>
+                          <div><span className="text-slate-400">約定日期：</span><strong>{formatMinguoDate(b.preferredDate)} ({String(b.preferredTimeSlot || '未指定').split(' ')[0]})</strong></div>
                           <div className="col-span-2"><span className="text-slate-400">地址：</span><strong>{b.address}</strong></div>
                           <div className="col-span-2"><span className="text-slate-400">品項：</span><strong className="text-emerald-400">{b.itemsChinese || b.items?.map(i => `${i.name}x${i.quantity}`).join(', ')}</strong></div>
                         </div>

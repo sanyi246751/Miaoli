@@ -254,14 +254,14 @@ import { formatMinguoDate, formatTaiwanPhone, getMinguoTime } from './utils/form
         if (!q) return;
         const res = bookings.filter(
           (b) =>
-            b.id.toLowerCase().includes(q) ||
-            b.phone.replaceAll('-', '').includes(q.replaceAll('-', '')) ||
-            b.applicantName.includes(q)
+            String(b.id || '').toLowerCase().includes(q) ||
+            String(b.phone || '').replaceAll('-', '').includes(q.replaceAll('-', '')) ||
+            String(b.applicantName || '').toLowerCase().includes(q)
         );
         setSearchResults(res);
         setHasSearched(true);
       };
-      const viewProps = { activeTab, setActiveTab, applicantName, setApplicantName, phone, setPhone, email, setEmail, county, setCounty, district, setDistrict, detailAddress, setDetailAddress, selectedItems, photos, setPhotos, preferredDate, setPreferredDate, preferredTimeSlot, setPreferredTimeSlot, locationNote, setLocationNote, setAgreedTerms, errors, isSubmitting, submitSecondsLeft, handleItemQtyChange, getItemQty, getItemNote, handleItemNoteChange, handleFileUpload, isAllTermsAgreed, handleFormSubmit, CATEGORIES, COUNTIES, DISTRICTS_BY_COUNTY, TERMS_LIST, formatMinguoDate, formatTaiwanPhone, setPrintableBooking, searchQuery, setSearchQuery, searchResults, hasSearched, handleSearchSubmit, gasUrl, successBooking, setSuccessBooking, printableBooking, QRCodeBox };
+      const viewProps = { activeTab, setActiveTab, applicantName, setApplicantName, phone, setPhone, email, setEmail, county, setCounty, district, setDistrict, detailAddress, setDetailAddress, selectedItems, photos, setPhotos, preferredDate, setPreferredDate, preferredTimeSlot, setPreferredTimeSlot, locationNote, setLocationNote, setAgreedTerms, errors, isSubmitting, submitSecondsLeft, handleItemQtyChange, getItemQty, getItemNote, handleItemNoteChange, handleFileUpload, isAllTermsAgreed, handleFormSubmit, CATEGORIES, COUNTIES, DISTRICTS_BY_COUNTY, TERMS_LIST, formatMinguoDate, formatTaiwanPhone, getMinguoTime, setPrintableBooking, searchQuery, setSearchQuery, searchResults, hasSearched, handleSearchSubmit, gasUrl, successBooking, setSuccessBooking, printableBooking, QRCodeBox };
 
       return (
         <div className="civic-shell min-h-screen flex flex-col">
