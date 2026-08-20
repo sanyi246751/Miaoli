@@ -49,7 +49,7 @@ export default function PrintableTagModal(props) {
                   </div>
 
                   <div className="pt-2 border-t border-slate-300 text-[10px] text-slate-500 flex justify-between">
-                    <span>※ 請勿夾雜事業廢棄物或危險物品 ‧ 清潔隊客服: (02) 2720-8889</span>
+                    <span>※ 請勿夾雜事業廢棄物或危險物品 ‧ 清潔隊電話: (037) 878457</span>
                     <span>列印日期: {formatMinguoDate(new Date())}</span>
                   </div>
                 </div>

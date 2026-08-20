@@ -11,7 +11,7 @@ export default function BookingQueryView(props) {
                   <form onSubmit={handleSearchSubmit} className="flex flex-col gap-3 sm:flex-row">
                     <input
                       type="text"
-                      placeholder="請輸入手機號碼 (如 0912-345-678) 或預約單號 (如 115-0815-001)"
+                      placeholder="請輸入手機號碼 (如 0912-345678) 或預約單號 (如 115-0815-001)"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-100"

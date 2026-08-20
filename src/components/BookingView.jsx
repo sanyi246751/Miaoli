@@ -14,7 +14,7 @@ export default function BookingView(props) {
                       <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-white/80 text-emerald-800 border border-emerald-200 mb-3 shadow-sm">
                         ✨ 環保免費服務 ‧ Google Sheets 雲端連線
                       </span>
-                      <h2 className="text-2xl sm:text-4xl font-black text-emerald-950">大型廢棄傢俱免費清運預約申請</h2>
+                      <h2 className="text-2xl sm:text-4xl font-black text-emerald-950">大型廢棄傢俱清運預約申請</h2>
                       <p className="text-xs sm:text-sm text-slate-600 mt-3 max-w-xl leading-relaxed">
                         提供床墊、櫃子、桌子、椅子、電視冰箱等家電清運。請填寫下方資料與上傳照片，送出後即獲取標籤與 QR Code。
                       </p>
@@ -110,11 +110,11 @@ export default function BookingView(props) {
 
                       <div className="sm:col-span-2">
                         <label className="block text-xs font-bold text-slate-300 mb-1">
-                          詳細清運地址（門牌與一樓放置處） <span className="text-rose-400">*</span>
+                          詳細清運地址 <span className="text-rose-400">*</span>
                         </label>
                         <input
                           type="text"
-                          placeholder="例如: 台北市大安區新生南路三段 88 號一樓門口"
+                          placeholder="例如: 苗栗縣三義鄉廣盛村復興路69號"
                           value={detailAddress}
                           onChange={(e) => setDetailAddress(e.target.value)}
                           className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-emerald-500"
