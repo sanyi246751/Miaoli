@@ -24,6 +24,7 @@
 - 新增、移除及快取可派遣車號。
 - 將案件分配至指定車輛、日期、上午／下午時段及第幾趟。
 - 依同車、同日、同時段及同趟次群組案件。
+- 使用 Gemini 合併辨識多張申請照片，比對照片物件數量與民眾申報數量，並保留人工覆核。
 - 建議或自訂停靠順序，透過 GAS 計算路線距離與時間。
 - 依柴油排放係數估算行程碳排量。
 - 更新案件為已排班、清運完成或已取消，並保留狀態歷程。
@@ -43,10 +44,85 @@
         Google Apps Script Web App
           ├─ Google Sheets：案件、狀態及車輛資料
           ├─ Google Drive：申請照片與結案照片
-          └─ Maps 服務：路線距離與時間（依 GAS 實作及權限）
+          ├─ Gemini API：多張照片物件辨識與數量比對
+          ├─ Maps 服務：地址定位、路線距離與時間
+          └─ LINE Messaging API：新案件群組通知
 ```
 
 前端會先顯示本機快取，並向 GAS Web App 讀取最新案件。新增案件、更新狀態、車輛管理、路線計算與照片上傳則透過 GAS action 完成。若 GAS 無法連線，部分前端操作仍可能只更新瀏覽器快取，因此正式使用時應確認雲端資料是否同步成功。
+
+## AI 工具與 Prompt
+
+### Gemini 照片辨識
+
+系統目前唯一使用的生成式 AI 是 Google Gemini，未使用 OpenAI、ChatGPT、Claude 或其他語言模型 API。相關程式位於 `google_apps_script.gs` 的 `executeAnalyzeBookingPhotos()`。
+
+- API：Gemini `generateContent`
+- API Key：由 GAS Script Properties 的 `GEMINI_API_KEY` 讀取
+- 模型：由 `GEMINI_MODEL` 指定，未設定時使用 `gemini-3.6-flash`
+- 回傳格式：`application/json`
+- Temperature：`0.1`
+- 輸入內容：民眾申報品項及 Google Drive 中的多張照片
+
+目前使用的 Prompt 如下；最後的「民眾申報」會在執行時附上該案件的品項 JSON：
+
+```text
+你是大型廢棄家具清運審核員。
+請合併判讀所有照片，避免同一物件在不同照片重複計數。
+只輸出 JSON：
+{
+  "items": [
+    {
+      "name": "物件名稱",
+      "quantity": 數字,
+      "confidence": 0到1
+    }
+  ],
+  "totalQuantity": 數字,
+  "uncertain": 布林值,
+  "note": "簡短說明"
+}
+民眾申報：[案件品項 JSON]
+```
+
+辨識完成後，程式會比較 AI 總數與申報總數。當數量相同且 `uncertain` 為 `false` 時，案件標記為「AI數量吻合／待人工核可」；否則標記為「數量有出入／待人工確認」。AI 結果不會直接完成最終核可，管理人員仍需人工確認。
+
+AI 辨識目前由管理端的「執行 AI 照片辨識」或「重新執行 AI 辨識」操作觸發；單純上傳照片不會自動呼叫 Gemini。
+
+## 資料處理與自動化流程
+
+### 預約與照片資料流
+
+```text
+民眾送出預約
+  → 前端驗證並建立案件資料
+  → GAS 將案件寫入 Google Sheets
+  → GAS 將地址轉換為經緯度及 Google Maps 連結
+  → 照片以 Base64 POST 至 GAS
+  → GAS 轉成 Blob 並儲存至 Google Drive
+  → Drive 網址寫回 Google Sheets
+  → 新案件資料透過 LINE Messaging API 推播至指定群組
+```
+
+Google Sheets 保存申請人資料、地址、申報品項、照片網址、案件狀態、狀態歷程、AI 辨識結果、人工確認件數、計費、派車與結案資訊。瀏覽器 `localStorage` 僅作為介面快取，正式資料仍應以 Google Sheets 為準。
+
+### AI 失敗重試
+
+Gemini 遇到 `429`、`500`、`502`、`503` 或 `504` 時，會先依序等待 0、2、5、10 秒進行同次執行重試。若仍失敗，案件會加入 Script Properties 的 `GEMINI_RETRY_QUEUE`，並建立約 2 分鐘後執行的 GAS 時間觸發器。每批最多處理 3 件，佇列仍有資料時會繼續安排下一次觸發。
+
+### 路線、碳排與計費
+
+- Google Maps Geocoder 將清運地址轉成座標。
+- GAS DirectionFinder 可最佳化停靠順序，並計算行車距離與時間。
+- 碳排量以「距離 ÷ 油耗 × 柴油排放係數」估算；介面預設油耗為 5 km/L、柴油排放係數為 2.69 kg CO₂e/L。
+- 計費會依地址或座標判斷同一戶，統計同年度已核可申請次數，再計算免費額度、計費件數及應收金額。
+- 管理端可以將篩選後的案件資料整理並匯出為 Excel 可開啟的 CSV。
+
+### 通知與部署自動化
+
+- 新案件成功寫入 Google Sheets 後，GAS 會透過 LINE Messaging API 推播案件單號、申請人、電話、地址、預約時段、品項及地圖連結。通知失敗不會使預約失敗。
+- 推送至 `main` 分支後，GitHub Actions 會自動安裝套件、執行 `npm run build`、上傳 `dist/` 並部署至 GitHub Pages。
+- `npm run github:update` 會執行建置、建立 Git commit 並推送目前分支，同時阻止 `google_apps_script.gs` 被加入版本控制。
 
 ## 使用技術
 
@@ -56,7 +132,9 @@
 - Lucide React / 內嵌圖示
 - `qrcode.react` / QRCode.js
 - Google Apps Script
+- Google Gemini API
 - Google Sheets、Google Drive 與 Google Maps 相關服務
+- LINE Messaging API
 - GitHub Actions、GitHub Pages
 
 ## 專案目錄
@@ -124,9 +202,11 @@ npm run preview
 3. 將本機 GAS 程式複製至 Apps Script 專案。
 4. 依程式頂端設定試算表 ID、Google Drive 資料夾 ID 等環境值。
 5. 在 Apps Script 的「專案設定 → 指令碼屬性」新增 `ADMIN_PASSWORD`，不要依賴程式中的預設密碼。
-6. 將專案部署為網頁應用程式，確認執行身分及存取範圍符合實際服務需求。
-7. 取得以 `/exec` 結尾的部署網址，更新 `index.html` 與 `admin.html` 中的 `DEFAULT_GAS_URL`。
-8. 實際測試案件讀取、建立、照片上傳、狀態更新、車號管理與路線計算。
+6. 若要啟用 AI 照片辨識，新增 `GEMINI_API_KEY`；可另以 `GEMINI_MODEL` 指定模型。
+7. 若要啟用 LINE 通知，新增 `LINE_CHANNEL_ACCESS_TOKEN` 與 `LINE_GROUP_ID`。
+8. 將專案部署為網頁應用程式，確認執行身分及存取範圍符合實際服務需求。
+9. 取得以 `/exec` 結尾的部署網址，更新 `index.html` 與 `admin.html` 中的 `DEFAULT_GAS_URL`。
+10. 實際測試案件讀取、建立、照片上傳、AI 辨識、狀態更新、車號管理、LINE 通知與路線計算。
 
 前端目前使用的主要 action 包括：
 
@@ -138,6 +218,9 @@ npm run preview
 | `verifyPassword` | 驗證後台密碼 |
 | `updateStatus` | 更新案件狀態及備註 |
 | `completeWithPhoto` | 上傳結案照片並完成案件 |
+| `analyzeBookingPhotos` | 使用 Gemini 分析案件照片 |
+| `confirmQuantity` | 人工確認物件數量並計算費用 |
+| `updateAppointmentTime` | 調整清運日期與時段 |
 | `getVehicles` | 讀取車號清單 |
 | `addVehicle` | 新增車號 |
 | `deleteVehicle` | 移除車號 |
@@ -193,6 +276,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/update-github.ps1 -C
 - **密碼傳輸方式：** 現行驗證透過查詢字串送出密碼，可能留在瀏覽器、代理伺服器或服務紀錄。正式公共系統建議改用 POST、雜湊驗證及伺服器端工作階段。
 - **前端登入不是完整授權：** `admin_auth_until` 存在使用者瀏覽器，不能單獨視為安全邊界。所有管理 action 都應在 GAS 後端再次驗證授權。
 - **個人資料：** 姓名、電話、Email、地址與照片皆屬敏感資料。請限制試算表、Drive 資料夾及 GAS 部署的存取權限，並建立保留與刪除政策。
+- **AI 資料傳輸：** 執行照片辨識時，申報品項與照片內容會傳送至 Gemini API。正式使用前應完成告知、同意、資料最小化、保存期限及供應商條款評估。
+- **AI 僅供輔助：** 照片可能模糊、遮擋或重複，辨識數量與信心值不可視為最終事實；計費或核可前應由管理人員覆核。
 - **Drive 分享設定：** 程式可能將照片設為持有連結者可查看。正式使用前應依機關政策檢查分享層級。
 - **CORS 與錯誤確認：** 部分寫入使用 `no-cors`，前端無法直接確認伺服器回應內容。重要操作應再讀取雲端資料確認是否成功。
 - **單號競爭：** 單號目前會參考瀏覽器快取產生；多人同時送件時可能產生相同序號。正式環境應改由 GAS 以鎖定機制統一配號。
