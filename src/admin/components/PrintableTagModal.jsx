@@ -1,5 +1,5 @@
 export default function PrintableTagModal(props) {
-  const { formatMinguoDate, setPrintableBooking, printableBooking, QRCodeBox } = props;
+  const { formatMinguoDate, setPrintableBooking, QRCodeBox, printableBooking } = props;
 
   return (
     <>
@@ -20,7 +20,7 @@ export default function PrintableTagModal(props) {
                       <h2 className="text-xl font-black mt-1">大型廢棄傢俱已預約清運標籤</h2>
                       <p className="text-xs text-slate-600 font-bold">請貼於搬出傢俱外觀明顯處 ‧ 清潔隊現場掃碼核對</p>
                     </div>
-                    <QRCodeBox value={`${window.location.origin}${window.location.pathname}?booking=${encodeURIComponent(printableBooking.id)}`} size={80} />
+                    <QRCodeBox value={`${window.location.origin}${window.location.pathname.replace(/admin\.html$/, 'index.html')}?booking=${encodeURIComponent(printableBooking.id)}`} size={80} />
                   </div>
 
                   <div className="grid grid-cols-2 gap-3 bg-slate-100 p-3 rounded-lg border border-slate-300 text-xs">
@@ -49,7 +49,7 @@ export default function PrintableTagModal(props) {
                   </div>
 
                   <div className="pt-2 border-t border-slate-300 text-[10px] text-slate-500 flex justify-between">
-                    <span>※ 請勿夾雜事業廢棄物或危險物品 ‧ 清潔隊客服: (037) 2720-8889</span>
+                    <span>※ 請勿夾雜事業廢棄物或危險物品 ‧ 清潔隊客服: (02) 2720-8889</span>
                     <span>列印日期: {formatMinguoDate(new Date())}</span>
                   </div>
                 </div>
