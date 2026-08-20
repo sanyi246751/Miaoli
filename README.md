@@ -263,26 +263,41 @@ API Key、管理密碼及外部服務設定必須放在 Script Properties。所�
 
 ```text
 .
-├─ .github/workflows/       GitHub Pages 自動部署流程
+├─ .github/
+│  └─ workflows/
+│     └─ deploy.yml         GitHub Pages 自動建置與部署流程
 ├─ scripts/
 │  └─ update-github.ps1     建置、提交及推送輔助腳本
-├─ src/                     元件化 React 版本原始碼
-│  ├─ components/           預約、查詢、後台、照片及列印元件
-│  ├─ data/mockData.js      品項、行政區與測試案件資料
-│  ├─ App.jsx               React 應用程式狀態與頁面切換
+├─ src/                     React 應用程式原始碼
+│  ├─ admin/                清潔隊管理端
+│  │  ├─ components/        後台頁首、案件、儀表板、結案及列印元件
+│  │  ├─ utils/             管理端格式化工具
+│  │  ├─ AdminApp.jsx       管理端狀態、API 與操作邏輯
+│  │  └─ main.jsx           管理端 React 掛載入口
+│  ├─ components/           民眾端預約、查詢、頁首尾及列印元件
+│  ├─ data/
+│  │  └─ appData.js         家具品項、行政區及服務條款資料
+│  ├─ utils/
+│  │  └─ formatters.js      民國日期與電話格式化工具
+│  ├─ App.jsx               民眾端狀態、預約及查詢邏輯
 │  ├─ index.css             Tailwind 與全域樣式
-│  └─ main.jsx              React 掛載入口
-├─ index.html               目前建置的民眾端主入口
-├─ admin.html               目前建置的管理端入口
+│  └─ main.jsx              民眾端 React 掛載入口
+├─ index.html               民眾端 HTML 與 /src/main.jsx 入口
+├─ admin.html               管理端 HTML 與 /src/admin/main.jsx 入口
 ├─ google_apps_script.gs    GAS 後端主程式（敏感檔，不納入 Git）
 ├─ vehicle_management.gs    GAS 車輛管理程式（敏感檔，不納入 Git）
+├─ AGENTS.md                Codex 專案操作與 GitHub 更新規則
+├─ README.md                專案說明、流程與開發 Prompt
+├─ 大型廢棄傢俱預約清運系統_競賽簡報.pptx
+│                            專案競賽簡報
 ├─ vite.config.js           Vite 多頁建置與網站路徑設定
 ├─ tailwind.config.js       Tailwind 設定
 ├─ postcss.config.js        PostCSS 設定
-└─ package.json             套件與常用指令
+├─ package.json             套件與常用指令
+└─ .gitignore               Git 排除規則與敏感檔保護
 ```
 
-> **維護者注意：** 現行 `vite.config.js` 的建置入口是根目錄的 `index.html` 與 `admin.html`。這兩個檔案本身包含完整 React/Babel 程式及 GAS 整合邏輯，並未載入 `src/main.jsx`。`src/` 目前是另一套元件化實作，修改其中檔案不一定會反映在正式建置結果。開發功能前請先決定要維護現行 HTML 入口，或完成把兩頁遷移至 `src/` 的工作，避免兩套程式產生差異。
+> **維護者注意：** `vite.config.js` 以根目錄的 `index.html` 與 `admin.html` 作為兩個建置入口；`index.html` 載入 `/src/main.jsx`，`admin.html` 載入 `/src/admin/main.jsx`。民眾端功能應修改 `src/App.jsx` 與 `src/components/`，管理端功能應修改 `src/admin/`，共用樣式則位於 `src/index.css`。
 
 ## 本機開發
 
@@ -409,7 +424,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/update-github.ps1 -C
 
 ### 修改 `src/` 後頁面沒有變化
 
-目前建置直接使用根目錄 `index.html` 與 `admin.html`，不會自動載入 `src/main.jsx`。請修改實際入口，或先完成元件化版本的入口遷移。
+請先確認修改位置是否對應正確入口：民眾端由 `index.html` 載入 `/src/main.jsx`，管理端由 `admin.html` 載入 `/src/admin/main.jsx`。修改後重新執行 `npm run dev`，或以 `npm run build` 產生新的 `dist/`；不要直接修改舊的 `dist/` 建置產物。
 
 ### 預約資料只在自己的瀏覽器出現
 
