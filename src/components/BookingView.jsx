@@ -1,5 +1,5 @@
 export default function BookingView(props) {
-  const { activeTab, applicantName, setApplicantName, phone, setPhone, email, setEmail, county, setCounty, district, setDistrict, detailAddress, setDetailAddress, selectedItems, photos, setPhotos, preferredDate, setPreferredDate, preferredTimeSlot, setPreferredTimeSlot, locationNote, setLocationNote, setAgreedTerms, errors, isSubmitting, submitSecondsLeft, handleItemQtyChange, getItemQty, getItemNote, handleItemNoteChange, handleFileUpload, isAllTermsAgreed, handleFormSubmit, CATEGORIES, COUNTIES, DISTRICTS_BY_COUNTY, TERMS_LIST, formatMinguoDate, formatTaiwanPhone } = props;
+  const { activeTab, applicantName, setApplicantName, phone, setPhone, email, setEmail, county, setCounty, district, setDistrict, detailAddress, setDetailAddress, selectedItems, photos, setPhotos, preferredDate, setPreferredDate, getUnavailableBookingReason, preferredTimeSlot, setPreferredTimeSlot, locationNote, setLocationNote, setAgreedTerms, errors, setErrors, isSubmitting, submitSecondsLeft, handleItemQtyChange, getItemQty, getItemNote, handleItemNoteChange, handleFileUpload, isAllTermsAgreed, handleFormSubmit, CATEGORIES, COUNTIES, DISTRICTS_BY_COUNTY, TERMS_LIST, formatMinguoDate, formatTaiwanPhone } = props;
 
   return (
     <>
@@ -231,12 +231,23 @@ export default function BookingView(props) {
                       <label className="block text-xs font-bold text-slate-300 mb-1">約定清運日期</label>
                       <input
                         type="date"
-                        min={new Date().toISOString().split('T')[0]}
+                        min={new Date().toLocaleDateString('sv-SE')}
                         value={preferredDate}
-                        onChange={(e) => setPreferredDate(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100"
+                        onChange={(e) => {
+                          const nextDate = e.target.value;
+                          const reason = getUnavailableBookingReason(nextDate);
+                          if (reason) {
+                            setErrors((current) => ({ ...current, preferredDate: reason }));
+                            return;
+                          }
+                          setPreferredDate(nextDate);
+                          setErrors((current) => ({ ...current, preferredDate: '' }));
+                        }}
+                        aria-invalid={Boolean(errors.preferredDate)}
+                        className={`w-full bg-slate-900 border rounded-xl px-4 py-2.5 text-sm text-slate-100 ${errors.preferredDate ? 'border-rose-500' : 'border-slate-700'}`}
                       />
-                      <p className="mt-1 text-[11px] text-slate-400">民國日期：{formatMinguoDate(preferredDate)}</p>
+                      <p className="mt-1 text-[11px] text-slate-400">民國日期：{formatMinguoDate(preferredDate)}；例假日及國定假日不開放預約。</p>
+                      {errors.preferredDate && <p className="mt-1 text-[11px] font-bold text-rose-400">{errors.preferredDate}</p>}
                     </div>
 
                     <div>

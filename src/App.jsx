@@ -6,7 +6,7 @@ import BookingSuccessModal from './components/BookingSuccessModal.jsx';
 import PrintableTagModal from './components/PrintableTagModal.jsx';
 import Footer from './components/Footer.jsx';
 import QRCodeBox from './components/QRCodeBox.jsx';
-import { CATEGORIES, COUNTIES, DISTRICTS_BY_COUNTY, TERMS_LIST, INITIAL_BOOKINGS } from './data/appData.js';
+import { CATEGORIES, COUNTIES, DISTRICTS_BY_COUNTY, TERMS_LIST, INITIAL_BOOKINGS, getUnavailableBookingReason } from './data/appData.js';
 import { formatMinguoDate, formatTaiwanPhone, getMinguoTime } from './utils/formatters.js';
 
     // Main App Component
@@ -74,7 +74,14 @@ import { formatMinguoDate, formatTaiwanPhone, getMinguoTime } from './utils/form
       const [detailAddress, setDetailAddress] = useState('');
       const [selectedItems, setSelectedItems] = useState([]);
       const [photos, setPhotos] = useState([]);
-      const defaultDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const toLocalDateString = (date) => date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
+      const getDefaultBookingDate = () => {
+        const date = new Date();
+        date.setDate(date.getDate() + 3);
+        while (getUnavailableBookingReason(toLocalDateString(date))) date.setDate(date.getDate() + 1);
+        return toLocalDateString(date);
+      };
+      const defaultDate = getDefaultBookingDate();
       const [preferredDate, setPreferredDate] = useState(defaultDate);
       const [preferredTimeSlot, setPreferredTimeSlot] = useState('上午8點至12點');
       const [locationNote, setLocationNote] = useState('');
@@ -168,6 +175,12 @@ import { formatMinguoDate, formatTaiwanPhone, getMinguoTime } from './utils/form
           errs.phone = '請輸入正確格式電話（如 0912-345678 或 037-123456）';
         }
         if (!detailAddress.trim()) errs.detailAddress = '請填寫詳細清運地址';
+        if (!preferredDate) errs.preferredDate = '請從日曆選擇約定清運日期';
+        else if (preferredDate < toLocalDateString(new Date())) errs.preferredDate = '約定清運日期不可早於今天';
+        else {
+          const unavailableReason = getUnavailableBookingReason(preferredDate);
+          if (unavailableReason) errs.preferredDate = unavailableReason;
+        }
         if (selectedItems.length === 0) errs.items = '請至少選擇一項待清運傢俱項目';
         if (agreedTerms.length < TERMS_LIST.length) errs.terms = '需全數同意 5 項申請聲明與規定';
 
@@ -237,7 +250,8 @@ import { formatMinguoDate, formatTaiwanPhone, getMinguoTime } from './utils/form
           setBookings((prev) => [newBooking, ...prev]);
           setSuccessBooking(newBooking);
           setApplicantName(''); setPhone(''); setEmail(''); setCounty('苗栗縣'); setDistrict('三義鄉');
-          setDetailAddress(''); setSelectedItems([]); setPhotos([]); setPreferredDate(defaultDate);
+          const nextDefaultDate = getDefaultBookingDate();
+          setDetailAddress(''); setSelectedItems([]); setPhotos([]); setPreferredDate(nextDefaultDate);
           setPreferredTimeSlot('上午8點至12點'); setLocationNote(''); setAgreedTerms([]); setErrors({}); setActiveTab('booking');
           window.scrollTo({ top: 0, behavior: 'smooth' });
         } finally {
@@ -261,7 +275,7 @@ import { formatMinguoDate, formatTaiwanPhone, getMinguoTime } from './utils/form
         setSearchResults(res);
         setHasSearched(true);
       };
-      const viewProps = { activeTab, setActiveTab, applicantName, setApplicantName, phone, setPhone, email, setEmail, county, setCounty, district, setDistrict, detailAddress, setDetailAddress, selectedItems, photos, setPhotos, preferredDate, setPreferredDate, preferredTimeSlot, setPreferredTimeSlot, locationNote, setLocationNote, setAgreedTerms, errors, isSubmitting, submitSecondsLeft, handleItemQtyChange, getItemQty, getItemNote, handleItemNoteChange, handleFileUpload, isAllTermsAgreed, handleFormSubmit, CATEGORIES, COUNTIES, DISTRICTS_BY_COUNTY, TERMS_LIST, formatMinguoDate, formatTaiwanPhone, getMinguoTime, setPrintableBooking, searchQuery, setSearchQuery, searchResults, hasSearched, handleSearchSubmit, gasUrl, successBooking, setSuccessBooking, printableBooking, QRCodeBox };
+      const viewProps = { activeTab, setActiveTab, applicantName, setApplicantName, phone, setPhone, email, setEmail, county, setCounty, district, setDistrict, detailAddress, setDetailAddress, selectedItems, photos, setPhotos, preferredDate, setPreferredDate, getUnavailableBookingReason, preferredTimeSlot, setPreferredTimeSlot, locationNote, setLocationNote, setAgreedTerms, errors, setErrors, isSubmitting, submitSecondsLeft, handleItemQtyChange, getItemQty, getItemNote, handleItemNoteChange, handleFileUpload, isAllTermsAgreed, handleFormSubmit, CATEGORIES, COUNTIES, DISTRICTS_BY_COUNTY, TERMS_LIST, formatMinguoDate, formatTaiwanPhone, getMinguoTime, setPrintableBooking, searchQuery, setSearchQuery, searchResults, hasSearched, handleSearchSubmit, gasUrl, successBooking, setSuccessBooking, printableBooking, QRCodeBox };
 
       return (
         <div className="civic-shell min-h-screen flex flex-col">

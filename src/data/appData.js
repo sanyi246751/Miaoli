@@ -60,3 +60,27 @@ export const TERMS_LIST = [
 ];
 
 export const INITIAL_BOOKINGS = [];
+
+// 依行政院人事行政總處 115 年政府行政機關辦公日曆表整理；跨年度時請依最新公告補充。
+export const NATIONAL_HOLIDAYS = {
+  '2026-01-01': '元旦',
+  '2026-02-16': '農曆春節假期', '2026-02-17': '農曆春節假期',
+  '2026-02-18': '農曆春節假期', '2026-02-19': '農曆春節假期', '2026-02-20': '農曆春節假期',
+  '2026-02-27': '和平紀念日補假',
+  '2026-04-03': '兒童節補假', '2026-04-06': '清明節補假',
+  '2026-05-01': '勞動節', '2026-06-19': '端午節',
+  '2026-09-25': '中秋節', '2026-09-28': '孔子誕辰紀念日／教師節',
+  '2026-10-09': '國慶日補假',
+  '2026-10-26': '臺灣光復暨金門古寧頭大捷紀念日補假',
+  '2026-12-25': '行憲紀念日'
+};
+
+export function getUnavailableBookingReason(value) {
+  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return '日期格式不正確';
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  if (date.getFullYear() !== Number(match[1]) || date.getMonth() !== Number(match[2]) - 1 || date.getDate() !== Number(match[3])) return '日期不存在';
+  if (date.getDay() === 0 || date.getDay() === 6) return '例假日（星期六、星期日）不提供預約';
+  if (NATIONAL_HOLIDAYS[value]) return NATIONAL_HOLIDAYS[value] + '不提供預約';
+  return '';
+}
