@@ -1,5 +1,7 @@
-const CACHE_NAME = 'miaoli-removal-v1'
-const APP_SHELL = ['/Miaoli/','/Miaoli/index.html','/Miaoli/admin.html','/Miaoli/offline.html','/Miaoli/manifest.webmanifest','/Miaoli/pwa-icon.svg']
+const CACHE_NAME = 'miaoli-removal-v2'
+const BASE_PATH = new URL(self.registration.scope).pathname
+const fromBase = (path = '') => `${BASE_PATH}${path}`
+const APP_SHELL = [fromBase(),fromBase('index.html'),fromBase('admin.html'),fromBase('work.html'),fromBase('offline.html'),fromBase('manifest.webmanifest'),fromBase('pwa-icon.svg')]
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)))
@@ -17,7 +19,7 @@ self.addEventListener('fetch', (event) => {
       const copy = response.clone()
       caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy))
       return response
-    }).catch(async () => (await caches.match(event.request)) || caches.match('/Miaoli/offline.html')))
+    }).catch(async () => (await caches.match(event.request)) || caches.match(fromBase('offline.html'))))
     return
   }
   event.respondWith(caches.match(event.request).then((cached) => cached || fetch(event.request).then((response) => {
