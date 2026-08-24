@@ -5,7 +5,19 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbwYPD1R7pq3boSvrZUcVYLH
 const SESSION_KEY = 'work_auth_until'
 const SESSION_MS = 8 * 60 * 60 * 1000
 const today = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' })
-const dispatchDate = (booking) => booking.adjustedDate || booking.preferredDate || ''
+const normalizeDate = (value) => {
+  const raw = String(value || '').trim()
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`
+  const english = raw.match(/^[A-Za-z]{3}\s+([A-Za-z]{3})\s+(\d{1,2})\s+(\d{4})/)
+  if (english) {
+    const month = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].indexOf(english[1]) + 1
+    if (month > 0) return `${english[3]}-${String(month).padStart(2, '0')}-${String(english[2]).padStart(2, '0')}`
+  }
+  const parsed = new Date(raw)
+  return Number.isNaN(parsed.getTime()) ? raw : parsed.toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' })
+}
+const dispatchDate = (booking) => normalizeDate(booking.adjustedDate || booking.preferredDate)
 const period = (booking) => booking.adjustedPeriod || String(booking.preferredTimeSlot || '').trim().split(/\s+/)[0]
 const address = (booking) => `${String(booking.district || '').startsWith('苗栗縣') ? '' : '苗栗縣'}${booking.district || ''}${booking.address || ''}`
 

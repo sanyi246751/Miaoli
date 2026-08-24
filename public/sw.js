@@ -1,4 +1,4 @@
-const CACHE_NAME = 'miaoli-removal-v2'
+const CACHE_NAME = 'miaoli-removal-v3'
 const BASE_PATH = new URL(self.registration.scope).pathname
 const fromBase = (path = '') => `${BASE_PATH}${path}`
 const APP_SHELL = [fromBase(),fromBase('index.html'),fromBase('admin.html'),fromBase('work.html'),fromBase('offline.html'),fromBase('manifest.webmanifest'),fromBase('pwa-icon.svg')]
@@ -14,6 +14,9 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return
+  const requestUrl = new URL(event.request.url)
+  // Google Apps Script and other APIs must always return current data.
+  if (requestUrl.origin !== self.location.origin) return
   if (event.request.mode === 'navigate') {
     event.respondWith(fetch(event.request).then((response) => {
       const copy = response.clone()
