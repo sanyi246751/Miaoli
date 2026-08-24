@@ -14,7 +14,7 @@ export default function Header(props) {
                       <span className="truncate text-base font-black tracking-tight text-emerald-950 sm:text-xl">大型傢俱清運</span>
                       <span className="hidden rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700 xl:inline">Google 雲端版</span>
                     </span>
-                    <span className="mt-0.5 hidden text-xs font-medium text-slate-400 sm:block">市民線上申請、進度查詢與清運管理</span>
+                    <span className="mt-0.5 hidden text-xs font-medium text-slate-400 sm:block">民眾線上申請、進度查詢與清運管理</span>
                   </span>
                 </button>
                 <nav className="flex shrink-0 items-center gap-1 rounded-2xl border border-slate-200 bg-slate-50 p-1" aria-label="市民服務">

@@ -24,7 +24,7 @@ export default function AdminHeader(props) {
                     <span>🛡️</span><span>後台管理模式</span>
                   </span>
                   <a href="./index.html" className="flex min-h-10 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-bold text-slate-600 transition-colors hover:bg-white/10 hover:text-white sm:px-4">
-                    <span>←</span><span className="hidden sm:inline">返回市民服務</span>
+                    <span>←</span><span className="hidden sm:inline">返回民眾服務</span>
                   </a>
                 </nav>
               </div>
