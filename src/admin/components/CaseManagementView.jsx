@@ -1,5 +1,17 @@
 export default function CaseManagementView(props) {
   const { activeTab, formatMinguoDate, getMinguoTime, vehicleSelections, setVehicleSelections, tripSelections, setTripSelections, appointmentTimeEditor, setAppointmentTimeEditor, vehicles, showVehicleManager, setShowVehicleManager, newVehicle, setNewVehicle, caseListView, setCaseListView, bookings, setPrintableBooking, setCompletionModalBooking, setPhotoPreview, isAdminAuth, setIsAdminAuth, adminPasswordInput, setAdminPasswordInput, isCheckingPassword, loginError, quantityDrafts, setQuantityDrafts, quantitySaving, quantityEditing, setQuantityEditing, aiSaving, getDispatchDate, getDispatchPeriod, getRouteKey, getNextDispatchTrip, getDispatchChoices, getDispatchLabel, getCountyDistrict, getLocalAddress, addVehicle, removeVehicle, getPhotoPreviewUrl, handleAdminLogin, handleAdminUpdateStatus, getRouteCarbon, getCustomRouteCarbon, getSuggestedRouteUrl, openRouteEditor, saveAppointmentTime, handleScheduleBooking, handleConfirmQuantity, handleRetryAi, handleCancelSchedule, handleExportCSV, isPendingStatus, getDisplayStatus, pendingCount, visibleCaseBookings } = props;
+  const getCreatedAtSortValue = (value) => {
+    const raw = String(value || '').trim();
+    const minguo = raw.match(/^(?:民國\s*)?(\d{2,3})[/.\-](\d{1,2})[/.\-](\d{1,2})(?:(上午|下午)?\s*(\d{1,2})[:時](\d{1,2})?)?/);
+    if (minguo) {
+      let hour = Number(minguo[5] || 0);
+      if (minguo[4] === '下午' && hour < 12) hour += 12;
+      if (minguo[4] === '上午' && hour === 12) hour = 0;
+      return new Date(Number(minguo[1]) + 1911, Number(minguo[2]) - 1, Number(minguo[3]), hour, Number(minguo[6] || 0)).getTime();
+    }
+    const timestamp = Date.parse(raw);
+    return Number.isFinite(timestamp) ? timestamp : Number.MAX_SAFE_INTEGER;
+  };
 
   return (
     <>
@@ -72,7 +84,7 @@ export default function CaseManagementView(props) {
                       <div className="flex flex-col gap-2 border-b border-slate-200 bg-emerald-50/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                           <h3 className="text-sm font-black text-slate-800">清運案件列表</h3>
-                          <p className="mt-0.5 text-xs text-slate-500">目前顯示 {visibleCaseBookings.length} 筆／共 {bookings.length} 筆案件，同一排班會集中排列並以框線標示</p>
+                          <p className="mt-0.5 text-xs text-slate-500">目前顯示 {visibleCaseBookings.length} 筆／共 {bookings.length} 筆案件，依申請時間由最早至最新排列</p>
                         </div>
                         <div className="flex flex-wrap items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 text-[11px] font-bold">
                           {[['active','進行中'],['completed','已完成'],['cancelled','已取消'],['all','全部']].map(([view, label]) => <button type="button" key={view} onClick={() => setCaseListView(view)} className={'rounded-lg px-3 py-1.5 transition-colors ' + (caseListView === view ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100')}>{label}</button>)}
@@ -92,13 +104,10 @@ export default function CaseManagementView(props) {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-200 text-slate-700">
-                            {[...visibleCaseBookings].sort((a, b) => {
-                              const aKey = a.status === '已排班' ? getRouteKey(a) : 'ZZZ|' + a.createdAt;
-                              const bKey = b.status === '已排班' ? getRouteKey(b) : 'ZZZ|' + b.createdAt;
-                              return aKey.localeCompare(bKey, 'zh-Hant');
-                            }).map((b, rowIndex, ordered) => {
-                              const groupKey = b.status === '已排班' ? getRouteKey(b) : '';
-                              const groupBookings = groupKey ? ordered.filter((item) => item.status === '已排班' && getRouteKey(item) === groupKey) : [b];
+                            {[...visibleCaseBookings].sort((a, b) => getCreatedAtSortValue(a.createdAt) - getCreatedAtSortValue(b.createdAt) || String(a.id || '').localeCompare(String(b.id || ''), 'zh-Hant')).map((b, rowIndex, ordered) => {
+                              const routeGroupKey = b.status === '已排班' ? getRouteKey(b) : '';
+                              const groupBookings = routeGroupKey ? ordered.filter((item) => item.status === '已排班' && getRouteKey(item) === routeGroupKey) : [b];
+                              const groupKey = '';
                               const isGroupStart = groupKey && (rowIndex === 0 || getRouteKey(ordered[rowIndex - 1]) !== groupKey || ordered[rowIndex - 1].status !== '已排班');
                               const isGroupEnd = groupKey && (rowIndex === ordered.length - 1 || getRouteKey(ordered[rowIndex + 1]) !== groupKey || ordered[rowIndex + 1].status !== '已排班');
                               return (
