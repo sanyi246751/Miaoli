@@ -24,7 +24,15 @@ export default function CaseManagementView(props) {
     if (/冰箱/.test(name)) return '冰箱';
     return '其他';
   };
-  const sumItemsByCategory = (items) => (items || []).reduce((totals, item) => {
+  const normalizeItemEntries = (items) => (items || []).flatMap((item) => {
+    const rawName = String(item.name || item.categoryName || '').trim();
+    if (!/[；;,、]/.test(rawName) || !/[x×]\s*\d+/i.test(rawName)) return [{ ...item, name: rawName }];
+    return rawName.split(/[；;,、]/).map((part) => {
+      const match = part.trim().match(/^(.+?)\s*[x×]\s*(\d+)\s*件?(?:\s*\(.*?\))?$/i);
+      return match ? { name: match[1].trim(), quantity: Number(match[2]) } : null;
+    }).filter(Boolean);
+  });
+  const sumItemsByCategory = (items) => normalizeItemEntries(items).reduce((totals, item) => {
     const category = getCategoryName(item.name);
     totals[category] = (totals[category] || 0) + Number(item.quantity || 0);
     return totals;
