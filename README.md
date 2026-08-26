@@ -4,6 +4,14 @@
 
 網站前端可直接部署至 GitHub Pages，正式資料則透過 Google Apps Script（GAS）串接 Google Sheets 與 Google Drive。瀏覽器的 `localStorage` 同時作為本機快取，讓介面在開發或暫時無法連線時仍保留部分資料。
 
+## 目前版本重點與資料檢視結果
+
+本文件已依目前程式重新核對。現行建置包含三個入口：民眾端 `index.html`、管理端 `admin.html` 與現場人員端 `work.html`。正式案件以 Google Sheets 為準，申請照片、AI 紅框標註照片及結案照片存放在 Google Drive；前端快取不能視為正式紀錄。
+
+目前 AI 覆核採「機器建議、人工決定」原則：Gemini 可以辨識多張照片、合併計數並提供框選座標，但 AI 件數不會直接成為計費件數。只要尚未完成逐品項人工核可，後端會將本次計費件數與應收金額維持為 0，管理端也會禁止排班。這項限制同時存在於後端資料寫入與前端操作流程，不只是畫面警告。
+
+> **版本邊界：** `google_apps_script.gs` 含正式環境識別碼且受 `.gitignore` 保護，因此 GitHub 只會保存前端與文件。本機修改 GAS 後，仍須由維護人員複製到 Apps Script、完成授權並重新部署，線上 `/exec` 才會更新。
+
 ## 主要功能
 
 ### 民眾端
@@ -25,11 +33,22 @@
 - 將案件分配至指定車輛、日期、上午／下午時段及第幾趟。
 - 依同車、同日、同時段及同趟次群組案件。
 - 使用 Gemini 合併辨識多張申請照片，比對照片物件數量與民眾申報數量，並保留人工覆核。
+- 將 Gemini 框選座標疊加至原始照片，以紅框、品名、信心值及可見特徵產生 Drive JPEG 備查圖。
+- 並列顯示民眾申報、AI 結果、不確定性、原始照片與 AI 標註照片。
+- 逐品項輸入人工確認數量並填寫判斷依據；未核可前不計費且禁止排班。
 - 建議或自訂停靠順序，透過 GAS 計算路線距離與時間。
 - 依柴油排放係數估算行程碳排量。
 - 更新案件為已排班、清運完成或已取消，並保留狀態歷程。
 - 上傳清運完成照片至 Google Drive。
 - 匯出 Excel 可開啟的 CSV 派車清單。
+
+### 現場人員端
+
+- 由 `work.html` 進入行動版作業頁面。
+- 依清運日期與車號查看當日待清運案件。
+- 顯示站次、案件單號、申請人、電話、地址及核定品項。
+- 可直接開啟導航、回報無法清運，或拍攝最多兩張照片完成結案。
+- 網路中斷時會顯示離線狀態，恢復後可重新同步案件。
 
 ## 系統架構與資料流
 
@@ -38,13 +57,15 @@
         │
         ├─ index.html      民眾預約與進度查詢
         ├─ admin.html      清潔隊管理後台
+        ├─ work.html       現場人員行動作業
         └─ localStorage    本機快取、登入期限、車輛與路線設定
                 │
                 ▼
         Google Apps Script Web App
           ├─ Google Sheets：案件、狀態及車輛資料
-          ├─ Google Drive：申請照片與結案照片
-          ├─ Gemini API：多張照片物件辨識與數量比對
+          ├─ Google Drive：申請照片、AI 標註照片與結案照片
+          ├─ Gemini API：多張照片物件辨識、數量比對與框選座標
+          ├─ Google Slides：原照疊加紅框與文字後輸出 JPEG
           ├─ Maps 服務：地址定位、路線距離與時間
           └─ LINE Messaging API：新案件群組通知
 ```
@@ -68,8 +89,10 @@
 目前使用的 Prompt 如下；最後的「民眾申報」會在執行時附上該案件的品項 JSON：
 
 ```text
-你是大型廢棄家具清運審核員。
+你是大型廢棄家具清運審核員與工安風險辨識人員。
 請合併判讀所有照片，避免同一物件在不同照片重複計數。
+每一個可見家具都要輸出所在照片序號，以及 0 到 1000 的正規化框選座標。
+同一件家具若出現在多張照片，可重複框選，但總數不得重複計算。
 只輸出 JSON：
 {
   "items": [
@@ -79,9 +102,30 @@
       "confidence": 0到1
     }
   ],
+  "detections": [
+    {
+      "photoIndex": 1,
+      "name": "物件名稱",
+      "confidence": 0到1,
+      "description": "簡短可見特徵",
+      "boundingBox": {
+        "xMin": 0到1000,
+        "yMin": 0到1000,
+        "xMax": 0到1000,
+        "yMax": 0到1000
+      }
+    }
+  ],
   "totalQuantity": 數字,
   "uncertain": 布林值,
-  "note": "簡短說明"
+  "note": "數量判讀說明",
+  "safetyRisk": {
+    "level": "low|medium|high",
+    "uncertain": 布林值,
+    "features": [],
+    "summary": "現場工安摘要",
+    "recommendations": ["可執行的預防措施"]
+  }
 }
 民眾申報：[案件品項 JSON]
 ```
@@ -93,6 +137,33 @@ AI 結果不會直接完成最終核可。後台並列顯示民眾申報、AI �
 工安分析會保存在同一份 AI 結果中，並於管理後台顯示風險等級、特徵證據與預防建議。照片角度不足時會標示「待現勘」；該結果僅供出車前風險篩查，不取代現場人員判斷。
 
 AI 辨識目前由管理端的「執行 AI 照片辨識」或「重新執行 AI 辨識」操作觸發；單純上傳照片不會自動呼叫 Gemini。
+
+### AI 紅框標註照片產生流程
+
+1. GAS 依案件「照片連結」讀取 Drive 原始圖片，並依順序標記為照片 1、照片 2……。
+2. Gemini 在 `detections` 回傳 `photoIndex`、物件名稱、信心值、可見特徵與框選座標。
+3. GAS 將座標限制在 0–1000，並忽略寬度或高度不合理的框選結果。
+4. GAS 建立暫存 Google Slides，將原照鋪滿頁面，再加入紅色外框及紅底白字標籤。
+5. 透過 Google Slides Thumbnail API 輸出圖片，轉為 JPEG 後寫入指定 Drive 資料夾。
+6. 檔名固定為 `{案件單號}-ai-{原照片序號}.jpg`；重新辨識時，會先將同名舊標註圖移至垃圾桶，避免同一案件累積多個同名版本。
+7. 標註圖的檔名、Drive 檔案 ID、檢視網址與直接顯示網址會寫入 AI 結果及「AI框選照片連結」欄位。
+8. 暫存簡報在輸出完成後移至垃圾桶；原始申請照片不會被覆寫。
+
+若 Gemini 沒有回傳有效 `detections`，系統仍會保存數量與工安判讀，但不會產生沒有框線的 AI 標註圖。框選照片只用於協助承辦人找出差異，不能取代原始照片或人工覆核。
+
+若 Slides 匯出、JPEG 轉換或 Drive 建檔失敗，錯誤會保存在 AI 結果的 `annotationErrors`，並直接顯示於案件後台；承辦人可在修正 API、授權或資料夾設定後，按「重新執行 AI 辨識與標註」。指定 Drive 資料夾無法存取時，後端會改存執行帳號的 Drive 根目錄並留下執行紀錄。
+
+### 數量差異與人工覆核規則
+
+| 判斷情況 | 系統狀態 | 自動計費 | 是否可排班 |
+| --- | --- | ---: | --- |
+| AI 總數等於申報總數，且 `uncertain=false` | AI數量吻合／待人工核可 | 0 元 | 否 |
+| AI 總數與申報總數不同 | 數量有出入／待人工確認 | 0 元 | 否 |
+| `uncertain=true` | 數量有出入／待人工確認 | 0 元 | 否 |
+| Gemini 失敗 | AI辨識失敗／待人工確認 | 0 元 | 否 |
+| 承辦人逐項確認並填寫依據 | 人工已核可 | 依人工件數試算 | 是 |
+
+人工覆核送出內容包含案件單號、逐品項名稱與數量、加總件數及判斷依據。後端會再次驗證每項都是 0 以上整數、逐項加總等於總件數且判斷依據不為空白，驗證通過後才寫入計費結果。
 
 ## 資料處理與自動化流程
 
@@ -110,6 +181,63 @@ AI 辨識目前由管理端的「執行 AI 照片辨識」或「重新執行 AI 
 ```
 
 Google Sheets 保存申請人資料、地址、申報品項、照片網址、案件狀態、狀態歷程、AI 辨識結果、人工確認件數、計費、派車與結案資訊。瀏覽器 `localStorage` 僅作為介面快取，正式資料仍應以 Google Sheets 為準。
+
+### Google Sheets 案件欄位
+
+GAS 的 `getSheet()` 會檢查欄數並寫入以下 32 個標題。新增的 AI 與人工覆核欄位接在既有欄位後方，不會插入中間而造成既有資料位移。
+
+| 分類 | 欄位 | 儲存內容 |
+| --- | --- | --- |
+| 案件識別 | 預約單號、申請時間 | 民國年案件編號與建立時間 |
+| 申請人 | 申請人姓名、聯絡電話、電子郵件 | 民眾聯絡資料 |
+| 地點 | 行政區、詳細地址、地圖連結、經度、緯度、Google比對地址、定位狀態 | 原始地址與定位結果 |
+| 預約 | 約定清運日期、希望時段、放置備註 | 民眾原始需求 |
+| 申報內容 | 清運品項(中文名稱與數量)、照片連結 | 申報 JSON 與原始 Drive 照片網址陣列 |
+| 執行狀態 | 目前狀態、處理時間軸與結案照 | 狀態異動、備註、排班及結案照片紀錄 |
+| 結案環境 | 結案里程(公里)、結案碳排量(kgCO₂e) | 實際結案路線估算結果 |
+| AI 覆核 | Gemini照片辨識結果、數量覆核狀態、AI框選照片連結 | Gemini JSON、待確認狀態與標註圖資料 |
+| 人工覆核 | 人工確認件數、人工確認品項、人工判斷依據 | 承辦人核定總數、逐項 JSON 與必填理由 |
+| 計費 | 年度已核可申請次數、本次計費件數、應收金額 | 同戶年度額度與人工核可後的費用 |
+| 調整資料 | 調整後清運日期、調整後清運時段 | 後台變更後的實際排程 |
+
+主要 JSON 欄位示例：
+
+```json
+{
+  "申報品項": [
+    { "name": "床墊", "quantity": 1 },
+    { "name": "櫃子", "quantity": 1 }
+  ],
+  "AI辨識": {
+    "items": [
+      { "name": "床墊", "quantity": 1, "confidence": 0.96 },
+      { "name": "櫃子", "quantity": 2, "confidence": 0.72 }
+    ],
+    "totalQuantity": 3,
+    "uncertain": true,
+    "annotatedPhotos": [
+      { "fileName": "115-0821-003-ai-1.jpg", "fileId": "Drive檔案ID", "fileUrl": "Drive檢視網址" }
+    ]
+  },
+  "人工確認品項": [
+    { "name": "床墊", "quantity": 1 },
+    { "name": "櫃子", "quantity": 1 }
+  ],
+  "人工判斷依據": "第二個櫃體為同一座組合櫃，照片覆核後計為1件"
+}
+```
+
+### 範例案件：申報 2 件、AI 辨識 3 件
+
+以案件 `115-0821-003` 為例，民眾申報床墊 1 件、櫃子 1 件，AI 判讀床墊 1 件、櫃子 2 件且 `uncertain=true`：
+
+1. 系統顯示原始申報共 2 件、AI 辨識共 3 件及差異說明。
+2. 後台提供 `115-0821-003-ai-1.jpg` 等紅框照片供比對。
+3. 案件進入「數量有出入／待人工確認」，確認件數不採用 AI 的 3 件，應收金額維持 0 元。
+4. 承辦人逐項檢查原始照片與紅框照片，填寫床墊與櫃子的正確數量及判斷依據。
+5. 若人工確認共 2 件，本次免費額度尚有效時應收 0 元。
+6. 若人工確認共 3 件，本次免費額度尚有效時為 1 件計費，應收 200 元。
+7. 若同戶本年度已用完 3 次免費申請，則本次人工確認的全部件數都列入計費。
 
 ### AI 失敗重試
 
@@ -148,12 +276,13 @@ flowchart TD
     B -->|管理人員| L[登入管理後台]
     L --> M[查看及篩選案件]
     M --> N[執行 Gemini 照片辨識]
-    N --> O{數量是否吻合}
+    N --> AA[產生紅框標註照片並存入 Drive]
+    AA --> O{數量是否吻合且判斷確定}
     O -->|吻合| P[標記 AI 數量吻合]
     O -->|不符或不確定| Q[標記待人工確認]
-    P --> R[人工核可數量]
+    P --> R[逐品項人工覆核並填寫判斷依據]
     Q --> R
-    R --> S[計算免費額度與應收金額]
+    R --> S[依人工確認結果計算免費額度與應收金額]
     S --> T[安排日期、車輛與趟次]
     T --> U[計算或調整清運路線]
     U --> V[估算距離與碳排量]
@@ -248,7 +377,7 @@ API Key、管理密碼及外部服務設定必須放在 Script Properties。所�
 
 建立 GitHub Actions workflow，在 main 分支 push 或手動執行時，使用 Node.js 24 安裝套件、執行 npm run build、上傳 dist 並部署至 GitHub Pages。
 
-另外建立 npm run github:update，依序執行建置、建立提交及推送目前分支。google_apps_script.gs、vehicle_management.gs、環境設定與敏感資料不得加入版本控制。
+另外建立 npm run github:update，依序執行建置、建立提交及推送目前分支。google_apps_script.gs、環境設定與敏感資料不得加入版本控制。
 ```
 
 ## 使用技術
@@ -280,6 +409,7 @@ API Key、管理密碼及外部服務設定必須放在 Script Properties。所�
 │  │  ├─ AdminApp.jsx       管理端狀態、API 與操作邏輯
 │  │  └─ main.jsx           管理端 React 掛載入口
 │  ├─ components/           民眾端預約、查詢、頁首尾及列印元件
+│  ├─ work/                 現場人員行動作業入口與畫面
 │  ├─ data/
 │  │  └─ appData.js         家具品項、行政區及服務條款資料
 │  ├─ utils/
@@ -289,8 +419,8 @@ API Key、管理密碼及外部服務設定必須放在 Script Properties。所�
 │  └─ main.jsx              民眾端 React 掛載入口
 ├─ index.html               民眾端 HTML 與 /src/main.jsx 入口
 ├─ admin.html               管理端 HTML 與 /src/admin/main.jsx 入口
+├─ work.html                現場端 HTML 與 /src/work/main.jsx 入口
 ├─ google_apps_script.gs    GAS 後端主程式（敏感檔，不納入 Git）
-├─ vehicle_management.gs    GAS 車輛管理程式（敏感檔，不納入 Git）
 ├─ AGENTS.md                Codex 專案操作與 GitHub 更新規則
 ├─ README.md                專案說明、流程與開發 Prompt
 ├─ 大型廢棄傢俱預約清運系統_競賽簡報.pptx
@@ -302,7 +432,7 @@ API Key、管理密碼及外部服務設定必須放在 Script Properties。所�
 └─ .gitignore               Git 排除規則與敏感檔保護
 ```
 
-> **維護者注意：** `vite.config.js` 以根目錄的 `index.html` 與 `admin.html` 作為兩個建置入口；`index.html` 載入 `/src/main.jsx`，`admin.html` 載入 `/src/admin/main.jsx`。民眾端功能應修改 `src/App.jsx` 與 `src/components/`，管理端功能應修改 `src/admin/`，共用樣式則位於 `src/index.css`。
+> **維護者注意：** `vite.config.js` 以根目錄的 `index.html`、`admin.html` 與 `work.html` 作為三個建置入口。民眾端功能位於 `src/App.jsx` 與 `src/components/`，管理端位於 `src/admin/`，現場端位於 `src/work/`，共用樣式位於 `src/index.css`。
 
 ## 本機開發
 
@@ -323,6 +453,7 @@ Vite 預設於 `http://localhost:3000` 啟動並自動開啟瀏覽器：
 
 - 民眾端：`http://localhost:3000/`
 - 管理端：`http://localhost:3000/admin.html`
+- 現場端：`http://localhost:3000/work.html`
 
 ### 建置與預覽
 
@@ -331,11 +462,11 @@ npm run build
 npm run preview
 ```
 
-建置結果會產生在 `dist/`，至少包含民眾端與管理端兩個 HTML 頁面。`dist/` 為產物目錄，已列入 `.gitignore`，不需手動提交。
+建置結果會產生在 `dist/`，包含民眾端、管理端與現場端三個 HTML 頁面。`dist/` 為產物目錄，已列入 `.gitignore`，不需手動提交。
 
 ## Google Apps Script 設定
 
-`google_apps_script.gs` 與 `vehicle_management.gs` 用於後端資料及車輛管理。兩個檔案被視為含有環境設定或敏感資訊，已列入 `.gitignore`，請勿強制加入 Git。
+`google_apps_script.gs` 包含案件、照片、AI、車輛、路線與通知等後端功能。此檔案含環境設定識別碼，已列入 `.gitignore`，請勿強制加入 Git。
 
 一般設定流程如下：
 
@@ -345,10 +476,12 @@ npm run preview
 4. 依程式頂端設定試算表 ID、Google Drive 資料夾 ID 等環境值。
 5. 在 Apps Script 的「專案設定 → 指令碼屬性」新增 `ADMIN_PASSWORD`，不要依賴程式中的預設密碼。
 6. 若要啟用 AI 照片辨識，新增 `GEMINI_API_KEY`；可另以 `GEMINI_MODEL` 指定模型。
-7. 若要啟用 LINE 通知，新增 `LINE_CHANNEL_ACCESS_TOKEN` 與 `LINE_GROUP_ID`。
-8. 將專案部署為網頁應用程式，確認執行身分及存取範圍符合實際服務需求。
-9. 取得以 `/exec` 結尾的部署網址，更新 `index.html` 與 `admin.html` 中的 `DEFAULT_GAS_URL`。
-10. 實際測試案件讀取、建立、照片上傳、AI 辨識、狀態更新、車號管理、LINE 通知與路線計算。
+7. 在 Apps Script 關聯的 Google Cloud 專案啟用 Google Slides API；AI 標註圖需使用 Slides Thumbnail API。
+8. 第一次測試時，手動執行會使用 Drive 或 Slides 的函式，完成 Google Drive、Google Slides、外部連線與試算表權限授權。
+9. 若要啟用 LINE 通知，新增 `LINE_CHANNEL_ACCESS_TOKEN` 與 `LINE_GROUP_ID`。
+10. 將專案部署為網頁應用程式，確認「執行身分」可以存取指定 Sheet 與 Drive 資料夾，並依服務需求設定可存取對象。
+11. 取得以 `/exec` 結尾的部署網址，更新 `src/App.jsx` 與 `src/admin/AdminApp.jsx` 中的 `DEFAULT_GAS_URL`；現場端同樣需指向正確後端。
+12. 實際測試案件讀取、建立、照片上傳、AI 辨識、紅框 JPG 產生、逐項人工覆核、計費、禁止未核可排班、車號管理、LINE 通知與路線計算。
 
 前端目前使用的主要 action 包括：
 
@@ -360,8 +493,8 @@ npm run preview
 | `verifyPassword` | 驗證後台密碼 |
 | `updateStatus` | 更新案件狀態及備註 |
 | `completeWithPhoto` | 上傳結案照片並完成案件 |
-| `analyzeBookingPhotos` | 使用 Gemini 分析案件照片 |
-| `confirmQuantity` | 人工確認物件數量並計算費用 |
+| `analyzeBookingPhotos` | 使用 Gemini 分析案件照片，產生紅框標註 JPG；GET 或 POST |
+| `confirmQuantity` | 以 POST 送出逐項數量、總數及必填判斷依據，人工核可後計費 |
 | `updateAppointmentTime` | 調整清運日期與時段 |
 | `getVehicles` | 讀取車號清單 |
 | `addVehicle` | 新增車號 |
@@ -410,7 +543,21 @@ npm run github:update
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/update-github.ps1 -CommitMessage "更新網站功能"
 ```
 
-執行前仍應檢查待提交檔案，確認沒有把設定檔、照片、紀錄或其他不相關內容上傳。尤其不可強制加入 `google_apps_script.gs` 與 `vehicle_management.gs`。
+執行前仍應檢查待提交檔案，確認沒有把設定檔、照片、紀錄或其他不相關內容上傳。尤其不可強制加入 `google_apps_script.gs`。
+
+### 上線驗收清單
+
+- [ ] `npm run build` 成功，`dist/` 內含 `index.html`、`admin.html` 與 `work.html`。
+- [ ] GAS `/exec` 預設 GET 能回傳 `status: success` 與案件陣列。
+- [ ] 新案件寫入 Sheet，申請照片依 `{案件單號}-{序號}.jpg` 存入 Drive。
+- [ ] 管理端可以執行 Gemini，Sheet 保存 AI JSON 與覆核狀態。
+- [ ] 有有效框選座標的照片會產生 `{案件單號}-ai-{序號}.jpg`，且後台可以開啟。
+- [ ] AI 不一致或不確定時，確認件數不採用 AI 結果、費用為 0，排班按鈕不可用。
+- [ ] 未填判斷依據、負數、小數或逐項加總不一致時，後端拒絕人工核可。
+- [ ] 人工確認 2 件且本次仍有免費資格時為 0 元；確認 3 件時為 200 元。
+- [ ] 同戶年度免費申請已達 3 次時，本次人工確認的全部件數均列入計費。
+- [ ] 完成人工核可後可以排班，現場端能讀取當日案件並拍照結案。
+- [ ] GitHub 提交不包含 `google_apps_script.gs`、照片、金鑰或其他敏感設定。
 
 ## 安全與正式上線注意事項
 
@@ -442,6 +589,21 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/update-github.ps1 -C
 ### 照片沒有出現在 Google Drive
 
 確認 Drive 資料夾 ID、Apps Script 執行帳號權限、Web App 部署版本，以及請求大小是否超過 Apps Script 限制。Base64 圖片不應放進 GET 網址，而應使用 POST 上傳。
+
+### Gemini 有辨識結果，但沒有 AI 紅框照片
+
+依序檢查：
+
+1. AI JSON 是否含有非空的 `detections`，且每筆都有正確 `photoIndex`。
+2. `boundingBox` 是否符合 0–1000，並且 `xMax > xMin`、`yMax > yMin`。
+3. Apps Script 執行紀錄是否出現 `AI annotated photo error`。
+4. 關聯的 Google Cloud 專案是否已啟用 Google Slides API。
+5. Web App 執行帳號是否已授權 Drive、Slides、試算表與外部連線權限。
+6. 指定 Drive 資料夾是否仍存在，且執行帳號具有建立檔案權限。
+
+### 人工覆核完成後仍無法排班
+
+確認案件的「數量覆核狀態」確實為 `人工已核可`，而不是 `AI數量吻合／待人工核可`。若前端顯示已核可但仍無法排班，請重新同步 Sheet，並檢查 `confirmQuantity` POST 回應是否包含 `confirmedItems`、`reviewNote`、`chargeableQuantity` 與 `amountDue`。
 
 ### GitHub Pages 顯示空白或資源 404
 
