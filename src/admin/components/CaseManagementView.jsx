@@ -1,3 +1,5 @@
+import { CATEGORIES } from '../../data/appData.js';
+
 export default function CaseManagementView(props) {
   const { activeTab, formatMinguoDate, getMinguoTime, vehicleSelections, setVehicleSelections, tripSelections, setTripSelections, appointmentTimeEditor, setAppointmentTimeEditor, vehicles, showVehicleManager, setShowVehicleManager, newVehicle, setNewVehicle, caseListView, setCaseListView, bookings, setPrintableBooking, setCompletionModalBooking, setPhotoPreview, isAdminAuth, setIsAdminAuth, adminPasswordInput, setAdminPasswordInput, isCheckingPassword, loginError, quantityDrafts, setQuantityDrafts, reviewItemDrafts, setReviewItemDrafts, reviewNoteDrafts, setReviewNoteDrafts, quantitySaving, quantityEditing, setQuantityEditing, aiSaving, getDispatchDate, getDispatchPeriod, getRouteKey, getNextDispatchTrip, getDispatchChoices, getDispatchLabel, getCountyDistrict, getLocalAddress, addVehicle, removeVehicle, getPhotoPreviewUrl, handleAdminLogin, handleAdminUpdateStatus, getRouteCarbon, getCustomRouteCarbon, getSuggestedRouteUrl, openRouteEditor, saveAppointmentTime, handleScheduleBooking, handleConfirmQuantity, handleRetryAi, handleCancelSchedule, handleExportCSV, isPendingStatus, getDisplayStatus, pendingCount, visibleCaseBookings } = props;
   const getCreatedAtSortValue = (value) => {
@@ -12,15 +14,35 @@ export default function CaseManagementView(props) {
     const timestamp = Date.parse(raw);
     return Number.isFinite(timestamp) ? timestamp : Number.MAX_SAFE_INTEGER;
   };
+  const getCategoryName = (value) => {
+    const name = String(value || '').trim();
+    if (/床墊|彈簧床(?!框)/.test(name)) return '床墊';
+    if (/櫃|斗櫃/.test(name)) return '櫃子';
+    if (/桌|茶几/.test(name)) return '桌子';
+    if (/椅|沙發/.test(name)) return '椅子';
+    if (/電視/.test(name)) return '電視';
+    if (/冰箱/.test(name)) return '冰箱';
+    return '其他';
+  };
+  const sumItemsByCategory = (items) => (items || []).reduce((totals, item) => {
+    const category = getCategoryName(item.name);
+    totals[category] = (totals[category] || 0) + Number(item.quantity || 0);
+    return totals;
+  }, {});
   const getReviewItems = (booking) => {
-    if (reviewItemDrafts[booking.id]) return reviewItemDrafts[booking.id];
-    if (booking.confirmedItems?.length) return booking.confirmedItems;
-    const merged = new Map();
-    ;[...(booking.items || []), ...(booking.aiReview?.items || [])].forEach((item) => {
-      const name = String(item.name || '其他').trim() || '其他';
-      if (!merged.has(name)) merged.set(name, Number(item.quantity || 0));
-    });
-    return [...merged].map(([name, quantity]) => ({ name, quantity }));
+    const declared = sumItemsByCategory(booking.items);
+    const ai = sumItemsByCategory(booking.aiReview?.items);
+    const confirmed = sumItemsByCategory(booking.confirmedItems);
+    const draft = sumItemsByCategory(reviewItemDrafts[booking.id]);
+    const hasDraft = Boolean(reviewItemDrafts[booking.id]);
+    const hasConfirmed = Boolean(booking.confirmedItems?.length);
+    return CATEGORIES.map((category) => ({
+      name: category.name,
+      description: category.desc,
+      declaredQuantity: Number(declared[category.name] || 0),
+      aiQuantity: Number(ai[category.name] || 0),
+      quantity: hasDraft ? Number(draft[category.name] || 0) : hasConfirmed ? Number(confirmed[category.name] || 0) : Number(declared[category.name] || 0)
+    }));
   };
 
   return (
@@ -71,22 +93,26 @@ export default function CaseManagementView(props) {
 
                     {/* Metric Summary */}
                     <div className="grid grid-cols-2 gap-3 text-center lg:grid-cols-4">
-                      <div className="glass-card rounded-2xl border border-white/10 p-4 shadow-sm">
+                      <button type="button" onClick={() => setCaseListView('all')} aria-pressed={caseListView === 'all'} className={'glass-card rounded-2xl border p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-sky-400 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-sky-400 ' + (caseListView === 'all' ? 'border-sky-400 ring-2 ring-sky-400/50' : 'border-white/10')}>
                         <span className="text-xs text-slate-400 block">總預約案件</span>
                         <strong className="text-2xl text-slate-100">{bookings.length}</strong>
-                      </div>
-                      <div className="glass-card rounded-2xl border border-white/10 p-4 shadow-sm">
+                        <span className="mt-1 block text-[10px] font-bold text-sky-300">點選查看全部</span>
+                      </button>
+                      <button type="button" onClick={() => setCaseListView('pending')} aria-pressed={caseListView === 'pending'} className={'glass-card rounded-2xl border p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-amber-400 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-amber-400 ' + (caseListView === 'pending' ? 'border-amber-400 ring-2 ring-amber-400/50' : 'border-white/10')}>
                         <span className="text-xs text-slate-400 block">待處理未排班</span>
                         <strong className="text-2xl text-amber-400">{pendingCount}</strong>
-                      </div>
-                      <div className="glass-card rounded-2xl border border-white/10 p-4 shadow-sm">
+                        <span className="mt-1 block text-[10px] font-bold text-amber-300">點選查看待處理</span>
+                      </button>
+                      <button type="button" onClick={() => setCaseListView('scheduled')} aria-pressed={caseListView === 'scheduled'} className={'glass-card rounded-2xl border p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-emerald-400 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-emerald-400 ' + (caseListView === 'scheduled' ? 'border-emerald-400 ring-2 ring-emerald-400/50' : 'border-white/10')}>
                         <span className="text-xs text-slate-400 block">已排班調度</span>
                         <strong className="text-2xl text-emerald-400">{bookings.filter(b=>b.status==='已排班').length}</strong>
-                      </div>
-                      <div className="glass-card rounded-2xl border border-white/10 p-4 shadow-sm">
+                        <span className="mt-1 block text-[10px] font-bold text-emerald-300">點選查看已排班</span>
+                      </button>
+                      <button type="button" onClick={() => setCaseListView('completed')} aria-pressed={caseListView === 'completed'} className={'glass-card rounded-2xl border p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-slate-300 ' + (caseListView === 'completed' ? 'border-slate-300 ring-2 ring-slate-300/50' : 'border-white/10')}>
                         <span className="text-xs text-slate-400 block">已完成清運</span>
                         <strong className="text-2xl text-slate-300">{bookings.filter(b=>b.status==='清運完成').length}</strong>
-                      </div>
+                        <span className="mt-1 block text-[10px] font-bold text-slate-300">點選查看已完成</span>
+                      </button>
                     </div>
 
                     {/* Table */}
@@ -97,7 +123,7 @@ export default function CaseManagementView(props) {
                           <p className="mt-0.5 text-xs text-slate-500">目前顯示 {visibleCaseBookings.length} 筆／共 {bookings.length} 筆案件，依申請時間由最早至最新排列</p>
                         </div>
                         <div className="flex flex-wrap items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 text-[11px] font-bold">
-                          {[['active','進行中'],['completed','已完成'],['cancelled','已取消'],['all','全部']].map(([view, label]) => <button type="button" key={view} onClick={() => setCaseListView(view)} className={'rounded-lg px-3 py-1.5 transition-colors ' + (caseListView === view ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100')}>{label}</button>)}
+                          {[['active','進行中'],['pending','待處理'],['scheduled','已排班'],['completed','已完成'],['cancelled','已取消'],['all','全部']].map(([view, label]) => <button type="button" key={view} onClick={() => setCaseListView(view)} className={'rounded-lg px-3 py-1.5 transition-colors ' + (caseListView === view ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100')}>{label}</button>)}
                         </div>
                       </div>
 
@@ -173,7 +199,7 @@ export default function CaseManagementView(props) {
                                     })()}
                                     <div className="mt-2 rounded-lg border border-slate-300 bg-white p-2 text-slate-800">
                                       <strong className="block">人工逐項覆核 {b.quantityReviewStatus === '人工已核可' && !quantityEditing[b.id] && <span className="text-slate-500">🔒 已鎖定</span>}</strong>
-                                      <div className="mt-1 grid gap-1 sm:grid-cols-2">{getReviewItems(b).map((item, itemIndex) => <label key={item.name + itemIndex} className="flex items-center justify-between rounded border border-slate-200 px-2 py-1"><span>{item.name}</span><input type="number" min="0" step="1" disabled={b.quantityReviewStatus === '人工已核可' && !quantityEditing[b.id]} value={item.quantity} onChange={(e) => { const next = getReviewItems(b).map((current, index) => index === itemIndex ? { ...current, quantity: e.target.value } : current); setReviewItemDrafts((state) => ({ ...state, [b.id]: next })); }} className="w-14 rounded border border-slate-300 px-1 py-0.5 text-center disabled:bg-slate-200" /></label>)}</div>
+                                      <div className="mt-1 grid gap-1 sm:grid-cols-2">{getReviewItems(b).map((item, itemIndex) => <label key={item.name + itemIndex} className="rounded border border-slate-200 p-2"><span className="flex items-center justify-between gap-2"><strong>{CATEGORIES[itemIndex]?.icon} {item.name}</strong><input type="number" min="0" step="1" aria-label={item.name + '人工確認數量'} disabled={b.quantityReviewStatus === '人工已核可' && !quantityEditing[b.id]} value={item.quantity} onChange={(e) => { const next = getReviewItems(b).map((current, index) => index === itemIndex ? { ...current, quantity: e.target.value } : current); setReviewItemDrafts((state) => ({ ...state, [b.id]: next })); }} className="w-14 rounded border border-slate-300 px-1 py-0.5 text-center disabled:bg-slate-200" /></span><span className="mt-1 block text-[9px] leading-3 text-slate-500">{item.description}</span><span className="mt-1 flex gap-1"><span className="rounded bg-sky-100 px-1.5 py-0.5 text-[9px] font-bold text-sky-800">申報 {item.declaredQuantity}</span><span className="rounded bg-violet-100 px-1.5 py-0.5 text-[9px] font-bold text-violet-800">AI {item.aiQuantity}</span></span></label>)}</div>
                                       <label className="mt-2 block font-bold">判斷依據（必填）<textarea disabled={b.quantityReviewStatus === '人工已核可' && !quantityEditing[b.id]} value={reviewNoteDrafts[b.id] ?? b.reviewNote ?? ''} onChange={(e) => setReviewNoteDrafts((state) => ({ ...state, [b.id]: e.target.value }))} placeholder="例如：第二個櫃體為同一座組合櫃，照片覆核後計為 1 件" rows="2" className="mt-1 w-full rounded border border-slate-300 p-2 font-normal disabled:bg-slate-200" /></label>
                                       <div className="mt-2 flex items-center justify-between"><span className="font-black">人工確認合計：{getReviewItems(b).reduce((sum, item) => sum + Number(item.quantity || 0), 0)} 件</span><button onClick={() => b.quantityReviewStatus === '人工已核可' && !quantityEditing[b.id] ? setQuantityEditing((current) => ({ ...current, [b.id]: true })) : handleConfirmQuantity(b)} disabled={quantitySaving === b.id} className="rounded bg-emerald-600 px-3 py-1.5 font-black text-white disabled:opacity-50">{quantitySaving === b.id ? '儲存中' : b.quantityReviewStatus === '人工已核可' && !quantityEditing[b.id] ? '修改覆核' : '人工確認並試算'}</button></div>
                                     </div>

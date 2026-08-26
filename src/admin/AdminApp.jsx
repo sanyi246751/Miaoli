@@ -623,6 +623,8 @@ import { formatMinguoDate, getMinguoCompactStr, getMinguoTime } from './utils/fo
       const getDisplayStatus = (status) => isPendingStatus(status) ? '待處理' : status;
       const pendingCount = bookings.filter((b) => isPendingStatus(b.status)).length;
       const visibleCaseBookings = bookings.filter((booking) => {
+        if (caseListView === 'pending') return isPendingStatus(booking.status);
+        if (caseListView === 'scheduled') return booking.status === '已排班';
         if (caseListView === 'completed') return booking.status === '清運完成';
         if (caseListView === 'cancelled') return booking.status === '已取消';
         if (caseListView === 'all') return true;
