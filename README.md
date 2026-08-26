@@ -140,11 +140,13 @@ AI 辨識目前由管理端的「執行 AI 照片辨識」或「重新執行 AI 
 
 ### AI 紅框標註照片產生流程
 
+效能優化版本會透過 `getBookingPhotoDataBatch` 一次取得本次需要的 Drive 原圖，使用 `Promise.all` 並行完成 Canvas 標註，再以 `uploadAiAnnotatedPhotos` 一次批次上傳並集中更新試算表。標註圖最長邊調整為 1600px、JPEG 品質為 0.84，以縮短傳輸與 Drive 建檔時間。
+
 1. GAS 依案件「照片連結」讀取 Drive 原始圖片，並依順序標記為照片 1、照片 2……。
 2. Gemini 在 `detections` 回傳 `photoIndex`、物件名稱、信心值、可見特徵與框選座標。
-3. 管理端透過 `getBookingPhotoData` 向 GAS 取得 Drive 原圖的 Base64 資料，避免跨來源圖片污染 Canvas。
-4. 瀏覽器 Canvas 將原照縮放至最長邊不超過 2000px，依 0–1000 座標加入紅色外框及紅底白字標籤。
-5. Canvas 以 JPEG、品質 0.9 輸出，再透過 `uploadAiAnnotatedPhoto` POST 至 GAS 並寫入指定 Drive 資料夾。
+3. 管理端透過 `getBookingPhotoDataBatch` 一次向 GAS 取得本次需要的 Drive 原圖 Base64，避免逐張往返及跨來源圖片污染 Canvas。
+4. 瀏覽器以 `Promise.all` 並行執行 Canvas 標註，將原照縮放至最長邊不超過 1600px，依 0–1000 座標加入紅色外框及紅底白字標籤。
+5. Canvas 以 JPEG、品質 0.84 輸出，再透過 `uploadAiAnnotatedPhotos` 一次批次送至 GAS；後端完成 Drive 建檔後集中更新一次試算表。
 6. 檔名固定為 `{案件單號}-ai-{原照片序號}.jpg`；重新辨識時，會先將同名舊標註圖移至垃圾桶，避免同一案件累積多個同名版本。
 7. 標註圖的檔名、Drive 檔案 ID、檢視網址與直接顯示網址會寫入 AI 結果及「AI框選照片連結」欄位。
 8. 全部照片處理完後，前端呼叫 `finalizeAiAnnotation` 保存成功照片與失敗原因；原始申請照片不會被覆寫。

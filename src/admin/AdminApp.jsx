@@ -376,7 +376,7 @@ import { formatMinguoDate, getMinguoCompactStr, getMinguoTime } from './utils/fo
         const image = new Image();
         image.onload = () => {
           try {
-            const maxSide = 2000;
+            const maxSide = 1600;
             const scale = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight));
             const canvas = document.createElement('canvas');
             canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
@@ -411,7 +411,7 @@ import { formatMinguoDate, getMinguoCompactStr, getMinguoTime } from './utils/fo
               context.fillStyle = '#ffffff';
               context.fillText(label, x + padding, labelY + labelHeight / 2, Math.max(1, labelWidth - padding * 2));
             });
-            resolve(canvas.toDataURL('image/jpeg', 0.9));
+            resolve(canvas.toDataURL('image/jpeg', 0.84));
           } catch (error) { reject(error); }
         };
         image.onerror = () => reject(new Error('瀏覽器無法載入原始照片'));
@@ -423,17 +423,22 @@ import { formatMinguoDate, getMinguoCompactStr, getMinguoTime } from './utils/fo
         const photoIndexes = [...new Set(detections.map((item) => Number(item.photoIndex)).filter((index) => Number.isInteger(index) && index > 0))].sort((a, b) => a - b);
         const errors = [];
         let annotatedPhotos = [];
-        for (const photoIndex of photoIndexes) {
+        if (photoIndexes.length) {
           try {
-            const sourceResponse = await fetch(gasUrl + '?action=getBookingPhotoData&id=' + encodeURIComponent(booking.id) + '&photoIndex=' + photoIndex);
+            const sourceResponse = await fetch(gasUrl + '?action=getBookingPhotoDataBatch&id=' + encodeURIComponent(booking.id) + '&photoIndexes=' + encodeURIComponent(JSON.stringify(photoIndexes)));
             const sourceResult = await sourceResponse.json();
-            if (sourceResult.status !== 'success' || !sourceResult.dataUrl) throw new Error(sourceResult.message || '無法取得原始照片');
-            const jpegData = await renderAiAnnotatedJpeg(sourceResult.dataUrl, detections.filter((item) => Number(item.photoIndex) === photoIndex));
-            const uploadResponse = await fetch(gasUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'uploadAiAnnotatedPhoto', id: booking.id, photoIndex, fileBase64: jpegData }) });
+            if (sourceResult.status !== 'success' || !Array.isArray(sourceResult.photos)) throw new Error(sourceResult.message || '無法取得原始照片');
+            errors.push(...(sourceResult.errors || []));
+            const renderedFiles = await Promise.all(sourceResult.photos.map(async (photo) => ({
+              photoIndex: Number(photo.photoIndex),
+              fileBase64: await renderAiAnnotatedJpeg(photo.dataUrl, detections.filter((item) => Number(item.photoIndex) === Number(photo.photoIndex)))
+            })));
+            const uploadResponse = await fetch(gasUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'uploadAiAnnotatedPhotos', id: booking.id, files: renderedFiles }) });
             const uploadResult = await uploadResponse.json();
-            if (uploadResult.status !== 'success') throw new Error(uploadResult.message || 'Drive 上傳失敗');
-            annotatedPhotos = uploadResult.annotatedPhotos || annotatedPhotos;
-          } catch (error) { errors.push(`照片 ${photoIndex} 標註上傳失敗：${error.message}`); }
+            if (uploadResult.status !== 'success') throw new Error(uploadResult.message || 'Drive 批次上傳失敗');
+            annotatedPhotos = uploadResult.annotatedPhotos || [];
+            errors.push(...(uploadResult.annotationErrors || []));
+          } catch (error) { errors.push(`AI 紅框照片批次處理失敗：${error.message}`); }
         }
         if (!photoIndexes.length) errors.push('Gemini 未回傳有效照片序號與框選座標');
         const finalizeResponse = await fetch(gasUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'finalizeAiAnnotation', id: booking.id, errors }) });
