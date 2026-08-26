@@ -54,6 +54,10 @@ import { formatMinguoDate, getMinguoCompactStr, getMinguoTime } from './utils/fo
         const local = original.replace(/^(?:苗栗縣)+/, '').replace(new RegExp('^' + getDistrictName(booking)), '').trim();
         return local || original;
       };
+      const getFullRouteAddress = (booking) => {
+        const localAddress = getLocalAddress(booking);
+        return localAddress ? getCountyDistrict(booking) + localAddress : '';
+      };
       const saveVehicleCache = (next) => { setVehicles(next); localStorage.setItem('recycling_vehicles', JSON.stringify(next)); };
       
       // GAS Web App URL state pre-configured with user's endpoint
@@ -235,7 +239,7 @@ import { formatMinguoDate, getMinguoCompactStr, getMinguoTime } from './utils/fo
       const getRouteBookings = (booking) => bookings.filter((item) => getDispatchDate(item) === getDispatchDate(booking) && item.assignedVehicle === booking.assignedVehicle && getDispatchPeriod(item) === getDispatchPeriod(booking) && getDispatchTrip(item) === getDispatchTrip(booking) && item.status === '已排班');
 
       const buildRouteUrl = (orderedBookings) => {
-        const stops = orderedBookings.map((item) => item.mapAddress || item.address).filter(Boolean);
+        const stops = orderedBookings.map(getFullRouteAddress).filter(Boolean);
         const destination = stops[stops.length - 1];
         const waypoints = stops.slice(0, -1);
         return 'https://www.google.com/maps/dir/?api=1&origin=' + encodeURIComponent(DISPATCH_ORIGIN) + '&destination=' + encodeURIComponent(destination) + (waypoints.length ? '&waypoints=' + encodeURIComponent(waypoints.join('|')) : '') + '&travelmode=driving';
@@ -280,13 +284,13 @@ import { formatMinguoDate, getMinguoCompactStr, getMinguoTime } from './utils/fo
         const groups = new Map();
         bookings.filter((item) => item.status === '已排班' && item.assignedVehicle).forEach((item) => { const key = getRouteKey(item); groups.set(key, [...(groups.get(key) || []), item]); });
         groups.forEach((items, key) => {
-          const signature = items.map((item) => item.id + ':' + item.address).sort().join('|');
+          const signature = items.map((item) => item.id + ':' + getFullRouteAddress(item)).sort().join('|');
           if ((routeCalculations[key]?.signature === signature && routeCalculations[key]?.status === 'done') || routeCalculations[key]?.status === 'calculating') return;
           setRouteCalculations((current) => ({ ...current, [key]: { status: 'calculating', signature } }));
           (async () => {
             try {
               if (!gasUrl) throw new Error('尚未設定 GAS Web App');
-              const addresses = getRecommendedOrder(items).map((item) => (item.district || '') + (item.address || '')); const response = await fetch(gasUrl + '?action=calculateRoute&optimize=true&addresses=' + encodeURIComponent(JSON.stringify(addresses))); const result = await response.json();
+              const addresses = getRecommendedOrder(items).map(getFullRouteAddress); const response = await fetch(gasUrl + '?action=calculateRoute&optimize=true&addresses=' + encodeURIComponent(JSON.stringify(addresses))); const result = await response.json();
               if (result.status !== 'success') throw new Error(result.message || '無法取得 Google 行車路線');
               const value = { status: 'done', signature, distanceKm: Number(result.distanceKm), carbonKg: Number(result.carbonKg), durationMinutes: Number(result.durationMinutes) };
               setRouteCalculations((current) => { const next = { ...current, [key]: value }; localStorage.setItem('recycling_route_calculations', JSON.stringify(next)); return next; });
@@ -295,7 +299,7 @@ import { formatMinguoDate, getMinguoCompactStr, getMinguoTime } from './utils/fo
         });
       }, [bookings]);
 
-      const calculateCustomRoute = async (booking, stops) => { const key = getRouteKey(booking); setCustomRoutes((current) => ({ ...current, [key]: { stopIds: stops.map((item) => item.id), calculation: { status: 'calculating' } } })); try { if (!gasUrl) throw new Error('尚未設定 GAS Web App'); const addresses = stops.map((item) => (item.district || '') + (item.address || '')); const response = await fetch(gasUrl + '?action=calculateRoute&optimize=false&addresses=' + encodeURIComponent(JSON.stringify(addresses))); const result = await response.json(); if (result.status !== 'success') throw new Error(result.message); const entry = { stopIds: stops.map((item) => item.id), calculation: { status: 'done', distanceKm: result.distanceKm, carbonKg: result.carbonKg, durationMinutes: result.durationMinutes } }; setCustomRoutes((current) => { const next = { ...current, [key]: entry }; localStorage.setItem('recycling_custom_routes', JSON.stringify(next)); return next; }); setRouteEditor((current) => current ? { ...current, distanceKm: Number(result.distanceKm).toFixed(1), fuelEfficiency: '5' } : current); } catch (error) { setCustomRoutes((current) => ({ ...current, [key]: { stopIds: stops.map((item) => item.id), calculation: { status: 'error', error: error.message } } })); } };
+      const calculateCustomRoute = async (booking, stops) => { const key = getRouteKey(booking); setCustomRoutes((current) => ({ ...current, [key]: { stopIds: stops.map((item) => item.id), calculation: { status: 'calculating' } } })); try { if (!gasUrl) throw new Error('尚未設定 GAS Web App'); const addresses = stops.map(getFullRouteAddress); const response = await fetch(gasUrl + '?action=calculateRoute&optimize=false&addresses=' + encodeURIComponent(JSON.stringify(addresses))); const result = await response.json(); if (result.status !== 'success') throw new Error(result.message); const entry = { stopIds: stops.map((item) => item.id), calculation: { status: 'done', distanceKm: result.distanceKm, carbonKg: result.carbonKg, durationMinutes: result.durationMinutes } }; setCustomRoutes((current) => { const next = { ...current, [key]: entry }; localStorage.setItem('recycling_custom_routes', JSON.stringify(next)); return next; }); setRouteEditor((current) => current ? { ...current, distanceKm: Number(result.distanceKm).toFixed(1), fuelEfficiency: '5' } : current); } catch (error) { setCustomRoutes((current) => ({ ...current, [key]: { stopIds: stops.map((item) => item.id), calculation: { status: 'error', error: error.message } } })); } };
       const openRouteEditor = (booking) => { const available = getRouteBookings(booking); const saved = customRoutes[getRouteKey(booking)]; const stops = saved?.stopIds ? saved.stopIds.map((id) => available.find((item) => item.id === id)).filter(Boolean).concat(available.filter((item) => !saved.stopIds.includes(item.id))) : getRecommendedOrder(available); setRouteEditor({ booking, stops, distanceKm: saved?.calculation?.distanceKm ? Number(saved.calculation.distanceKm).toFixed(1) : '', fuelEfficiency: '5' }); if (!saved?.calculation?.distanceKm) calculateCustomRoute(booking, stops); };
       const moveRouteStop = (index, direction) => { if (!routeEditor) return; const nextIndex = index + direction; if (nextIndex < 0 || nextIndex >= routeEditor.stops.length) return; const stops = [...routeEditor.stops]; [stops[index], stops[nextIndex]] = [stops[nextIndex], stops[index]]; setRouteEditor({ ...routeEditor, stops, distanceKm: '' }); calculateCustomRoute(routeEditor.booking, stops); };
 
