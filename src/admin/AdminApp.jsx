@@ -372,6 +372,78 @@ import { formatMinguoDate, getMinguoCompactStr, getMinguoTime } from './utils/fo
         finally { setQuantitySaving(''); }
       };
 
+      const renderAiAnnotatedJpeg = (dataUrl, detections) => new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => {
+          try {
+            const maxSide = 2000;
+            const scale = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight));
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+            canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+            const context = canvas.getContext('2d');
+            context.drawImage(image, 0, 0, canvas.width, canvas.height);
+            const lineWidth = Math.max(4, Math.round(Math.min(canvas.width, canvas.height) * 0.006));
+            const fontSize = Math.max(18, Math.round(Math.min(canvas.width, canvas.height) * 0.028));
+            context.lineWidth = lineWidth;
+            context.strokeStyle = '#ef4444';
+            context.font = `bold ${fontSize}px sans-serif`;
+            context.textBaseline = 'middle';
+            detections.forEach((detection) => {
+              const box = detection.boundingBox || detection.box || {};
+              const clamp = (value) => Math.max(0, Math.min(1000, Number(value || 0)));
+              const xMin = clamp(box.xMin ?? box.xmin); const yMin = clamp(box.yMin ?? box.ymin);
+              const xMax = clamp(box.xMax ?? box.xmax); const yMax = clamp(box.yMax ?? box.ymax);
+              if (xMax <= xMin || yMax <= yMin) return;
+              const x = canvas.width * xMin / 1000; const y = canvas.height * yMin / 1000;
+              const width = canvas.width * (xMax - xMin) / 1000; const height = canvas.height * (yMax - yMin) / 1000;
+              context.strokeRect(x, y, width, height);
+              const confidence = Number(detection.confidence);
+              const confidenceLabel = Number.isFinite(confidence) ? ` ${Math.round(confidence * 100)}%` : '';
+              const description = String(detection.description || '').trim();
+              const label = `${detection.name || '辨識物件'}${confidenceLabel}${description ? `｜${description}` : ''}`.slice(0, 42);
+              const padding = Math.max(6, Math.round(fontSize * 0.35));
+              const labelWidth = Math.min(canvas.width - x, context.measureText(label).width + padding * 2);
+              const labelHeight = fontSize + padding * 2;
+              const labelY = Math.max(0, y - labelHeight);
+              context.fillStyle = '#dc2626';
+              context.fillRect(x, labelY, labelWidth, labelHeight);
+              context.fillStyle = '#ffffff';
+              context.fillText(label, x + padding, labelY + labelHeight / 2, Math.max(1, labelWidth - padding * 2));
+            });
+            resolve(canvas.toDataURL('image/jpeg', 0.9));
+          } catch (error) { reject(error); }
+        };
+        image.onerror = () => reject(new Error('瀏覽器無法載入原始照片'));
+        image.src = dataUrl;
+      });
+
+      const generateAndUploadAiAnnotations = async (booking, aiReview) => {
+        const detections = Array.isArray(aiReview?.detections) ? aiReview.detections : [];
+        const photoIndexes = [...new Set(detections.map((item) => Number(item.photoIndex)).filter((index) => Number.isInteger(index) && index > 0))].sort((a, b) => a - b);
+        const errors = [];
+        let annotatedPhotos = [];
+        for (const photoIndex of photoIndexes) {
+          try {
+            const sourceResponse = await fetch(gasUrl + '?action=getBookingPhotoData&id=' + encodeURIComponent(booking.id) + '&photoIndex=' + photoIndex);
+            const sourceResult = await sourceResponse.json();
+            if (sourceResult.status !== 'success' || !sourceResult.dataUrl) throw new Error(sourceResult.message || '無法取得原始照片');
+            const jpegData = await renderAiAnnotatedJpeg(sourceResult.dataUrl, detections.filter((item) => Number(item.photoIndex) === photoIndex));
+            const uploadResponse = await fetch(gasUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'uploadAiAnnotatedPhoto', id: booking.id, photoIndex, fileBase64: jpegData }) });
+            const uploadResult = await uploadResponse.json();
+            if (uploadResult.status !== 'success') throw new Error(uploadResult.message || 'Drive 上傳失敗');
+            annotatedPhotos = uploadResult.annotatedPhotos || annotatedPhotos;
+          } catch (error) { errors.push(`照片 ${photoIndex} 標註上傳失敗：${error.message}`); }
+        }
+        if (!photoIndexes.length) errors.push('Gemini 未回傳有效照片序號與框選座標');
+        const finalizeResponse = await fetch(gasUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'finalizeAiAnnotation', id: booking.id, errors }) });
+        const finalizeResult = await finalizeResponse.json();
+        if (finalizeResult.status === 'success') annotatedPhotos = finalizeResult.annotatedPhotos || annotatedPhotos;
+        setBookings((current) => current.map((item) => item.id === booking.id ? { ...item, aiAnnotatedPhotos: annotatedPhotos, aiReview: { ...(item.aiReview || aiReview), annotatedPhotos, annotationPending: false, annotationErrors: errors } } : item));
+        if (errors.length) throw new Error(errors.join('\n'));
+        return annotatedPhotos;
+      };
+
       const handleRetryAi = async (booking) => {
         setAiSaving(booking.id);
         try {
@@ -388,6 +460,7 @@ import { formatMinguoDate, getMinguoCompactStr, getMinguoTime } from './utils/fo
             amountDue: result.amountDue ?? item.amountDue
           } : item));
           if (result.status !== 'success' && result.status !== 'retry_scheduled') throw new Error(result.message || '辨識失敗');
+          if (result.status === 'success') await generateAndUploadAiAnnotations(booking, result.aiReview);
         } catch (error) { window.alert('AI 重新辨識失敗：' + error.message); }
         finally { setAiSaving(''); }
       };

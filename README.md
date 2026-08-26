@@ -65,7 +65,7 @@
           ├─ Google Sheets：案件、狀態及車輛資料
           ├─ Google Drive：申請照片、AI 標註照片與結案照片
           ├─ Gemini API：多張照片物件辨識、數量比對與框選座標
-          ├─ Google Slides：原照疊加紅框與文字後輸出 JPEG
+          ├─ Browser Canvas：原照疊加紅框與文字後輸出 JPEG
           ├─ Maps 服務：地址定位、路線距離與時間
           └─ LINE Messaging API：新案件群組通知
 ```
@@ -142,16 +142,16 @@ AI 辨識目前由管理端的「執行 AI 照片辨識」或「重新執行 AI 
 
 1. GAS 依案件「照片連結」讀取 Drive 原始圖片，並依順序標記為照片 1、照片 2……。
 2. Gemini 在 `detections` 回傳 `photoIndex`、物件名稱、信心值、可見特徵與框選座標。
-3. GAS 將座標限制在 0–1000，並忽略寬度或高度不合理的框選結果。
-4. GAS 建立暫存 Google Slides，將原照鋪滿頁面，再加入紅色外框及紅底白字標籤。
-5. 透過 Google Slides Thumbnail API 輸出圖片，轉為 JPEG 後寫入指定 Drive 資料夾。
+3. 管理端透過 `getBookingPhotoData` 向 GAS 取得 Drive 原圖的 Base64 資料，避免跨來源圖片污染 Canvas。
+4. 瀏覽器 Canvas 將原照縮放至最長邊不超過 2000px，依 0–1000 座標加入紅色外框及紅底白字標籤。
+5. Canvas 以 JPEG、品質 0.9 輸出，再透過 `uploadAiAnnotatedPhoto` POST 至 GAS 並寫入指定 Drive 資料夾。
 6. 檔名固定為 `{案件單號}-ai-{原照片序號}.jpg`；重新辨識時，會先將同名舊標註圖移至垃圾桶，避免同一案件累積多個同名版本。
 7. 標註圖的檔名、Drive 檔案 ID、檢視網址與直接顯示網址會寫入 AI 結果及「AI框選照片連結」欄位。
-8. 暫存簡報在輸出完成後移至垃圾桶；原始申請照片不會被覆寫。
+8. 全部照片處理完後，前端呼叫 `finalizeAiAnnotation` 保存成功照片與失敗原因；原始申請照片不會被覆寫。
 
 若 Gemini 沒有回傳有效 `detections`，系統仍會保存數量與工安判讀，但不會產生沒有框線的 AI 標註圖。框選照片只用於協助承辦人找出差異，不能取代原始照片或人工覆核。
 
-若 Slides 匯出、JPEG 轉換或 Drive 建檔失敗，錯誤會保存在 AI 結果的 `annotationErrors`，並直接顯示於案件後台；承辦人可在修正 API、授權或資料夾設定後，按「重新執行 AI 辨識與標註」。指定 Drive 資料夾無法存取時，後端會改存執行帳號的 Drive 根目錄並留下執行紀錄。
+若原圖讀取、Canvas 繪製、JPEG 輸出或 Drive 建檔失敗，錯誤會保存在 AI 結果的 `annotationErrors`，並直接顯示於案件後台；承辦人可在修正照片或 Drive 權限後按「重新執行 AI 辨識與標註」。指定 Drive 資料夾無法存取時，後端會改存執行帳號的 Drive 根目錄並留下執行紀錄。此方案不使用 Google Slides，也不需要 Slides API 或 `presentations` OAuth 權限。
 
 ### 數量差異與人工覆核規則
 
@@ -476,12 +476,10 @@ npm run preview
 4. 依程式頂端設定試算表 ID、Google Drive 資料夾 ID 等環境值。
 5. 在 Apps Script 的「專案設定 → 指令碼屬性」新增 `ADMIN_PASSWORD`，不要依賴程式中的預設密碼。
 6. 若要啟用 AI 照片辨識，新增 `GEMINI_API_KEY`；可另以 `GEMINI_MODEL` 指定模型。
-7. 在 Apps Script 關聯的 Google Cloud 專案啟用 Google Slides API；AI 標註圖需使用 Slides Thumbnail API。
-8. 第一次測試時，手動執行會使用 Drive 或 Slides 的函式，完成 Google Drive、Google Slides、外部連線與試算表權限授權。
-9. 若要啟用 LINE 通知，新增 `LINE_CHANNEL_ACCESS_TOKEN` 與 `LINE_GROUP_ID`。
-10. 將專案部署為網頁應用程式，確認「執行身分」可以存取指定 Sheet 與 Drive 資料夾，並依服務需求設定可存取對象。
-11. 取得以 `/exec` 結尾的部署網址，更新 `src/App.jsx` 與 `src/admin/AdminApp.jsx` 中的 `DEFAULT_GAS_URL`；現場端同樣需指向正確後端。
-12. 實際測試案件讀取、建立、照片上傳、AI 辨識、紅框 JPG 產生、逐項人工覆核、計費、禁止未核可排班、車號管理、LINE 通知與路線計算。
+7. 若要啟用 LINE 通知，新增 `LINE_CHANNEL_ACCESS_TOKEN` 與 `LINE_GROUP_ID`。
+8. 將專案部署為網頁應用程式，確認「執行身分」可以存取指定 Sheet 與 Drive 資料夾，並依服務需求設定可存取對象。
+9. 取得以 `/exec` 結尾的部署網址，更新 `src/App.jsx` 與 `src/admin/AdminApp.jsx` 中的 `DEFAULT_GAS_URL`；現場端同樣需指向正確後端。
+10. 實際測試案件讀取、建立、照片上傳、AI 辨識、Canvas 紅框 JPG 產生、逐項人工覆核、計費、禁止未核可排班、車號管理、LINE 通知與路線計算。
 
 前端目前使用的主要 action 包括：
 
@@ -493,7 +491,10 @@ npm run preview
 | `verifyPassword` | 驗證後台密碼 |
 | `updateStatus` | 更新案件狀態及備註 |
 | `completeWithPhoto` | 上傳結案照片並完成案件 |
-| `analyzeBookingPhotos` | 使用 Gemini 分析案件照片，產生紅框標註 JPG；GET 或 POST |
+| `analyzeBookingPhotos` | 使用 Gemini 分析案件照片並回傳物件框選座標；GET 或 POST |
+| `getBookingPhotoData` | 供管理端取得指定原圖的 Base64，以便 Canvas 安全繪製 |
+| `uploadAiAnnotatedPhoto` | 接收 Canvas JPEG，依 `{案件單號}-ai-{序號}.jpg` 存入 Drive |
+| `finalizeAiAnnotation` | 保存整批標註完成狀態及個別照片錯誤 |
 | `confirmQuantity` | 以 POST 送出逐項數量、總數及必填判斷依據，人工核可後計費 |
 | `updateAppointmentTime` | 調整清運日期與時段 |
 | `getVehicles` | 讀取車號清單 |
@@ -596,10 +597,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/update-github.ps1 -C
 
 1. AI JSON 是否含有非空的 `detections`，且每筆都有正確 `photoIndex`。
 2. `boundingBox` 是否符合 0–1000，並且 `xMax > xMin`、`yMax > yMin`。
-3. Apps Script 執行紀錄是否出現 `AI annotated photo error`。
-4. 關聯的 Google Cloud 專案是否已啟用 Google Slides API。
-5. Web App 執行帳號是否已授權 Drive、Slides、試算表與外部連線權限。
+3. 後台錯誤是否指出 `getBookingPhotoData` 無法讀取原始 Drive 照片。
+4. 瀏覽器是否能建立 Canvas 並輸出 JPEG；過大或損毀圖片應重新壓縮上傳。
+5. Web App 執行帳號是否已授權 Drive、試算表與外部連線權限。
 6. 指定 Drive 資料夾是否仍存在，且執行帳號具有建立檔案權限。
+7. 線上 GAS 是否已重新部署，並包含 `getBookingPhotoData`、`uploadAiAnnotatedPhoto` 與 `finalizeAiAnnotation` 三個新 action。
+
+新版已完全移除 `SlidesApp.create` 與 Slides Thumbnail API。如果後台仍出現 Slides 權限或 Slides API 403，代表線上 Web App 還在執行舊版 GAS；請複製最新後端並建立新的部署版本。
 
 ### 人工覆核完成後仍無法排班
 
