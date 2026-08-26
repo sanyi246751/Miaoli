@@ -193,6 +193,8 @@ import { formatMinguoDate, getMinguoCompactStr, getMinguoTime } from './utils/fo
       }, []);
 
       const [quantityDrafts, setQuantityDrafts] = useState({});
+      const [reviewItemDrafts, setReviewItemDrafts] = useState({});
+      const [reviewNoteDrafts, setReviewNoteDrafts] = useState({});
       const [quantitySaving, setQuantitySaving] = useState('');
       const [quantityEditing, setQuantityEditing] = useState({});
       const [aiSaving, setAiSaving] = useState('');
@@ -317,6 +319,7 @@ import { formatMinguoDate, getMinguoCompactStr, getMinguoTime } from './utils/fo
       };
 
       const handleScheduleBooking = (booking) => {
+        if (booking.quantityReviewStatus !== '人工已核可') { window.alert('請先完成人工逐項覆核與計費，再進行排班。'); return; }
         const vehicle = vehicleSelections[booking.id] || (booking.status === '已取消' ? '' : booking.assignedVehicle);
         const dispatchTrip = Number(tripSelections[booking.id] || getNextDispatchTrip(booking, vehicle));
         if (!vehicle) return;
@@ -339,23 +342,31 @@ import { formatMinguoDate, getMinguoCompactStr, getMinguoTime } from './utils/fo
       };
 
       const handleConfirmQuantity = async (booking) => {
-        const declaredTotal = (booking.items || []).reduce((sum, item) => sum + Number(item.quantity || 0), 0);
-        const quantity = Number(quantityDrafts[booking.id] ?? booking.confirmedQuantity ?? declaredTotal);
+        const sourceItems = reviewItemDrafts[booking.id] || booking.confirmedItems || (booking.items || []);
+        const items = sourceItems.map((item) => ({ name: String(item.name || '其他'), quantity: Number(item.quantity || 0) }));
+        const quantity = items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+        const note = String(reviewNoteDrafts[booking.id] ?? booking.reviewNote ?? '').trim();
         if (!Number.isInteger(quantity) || quantity < 0) { window.alert('請填寫 0 以上的正確整數件數。'); return; }
+        if (items.some((item) => !Number.isInteger(item.quantity) || item.quantity < 0)) { window.alert('各品項請填寫 0 以上的正確整數件數。'); return; }
+        if (!note) { window.alert('請填寫人工判斷依據後再確認。'); return; }
         setQuantitySaving(booking.id);
         try {
-          const response = await fetch(gasUrl + '?action=confirmQuantity&id=' + encodeURIComponent(booking.id) + '&quantity=' + quantity + '&note=' + encodeURIComponent('後台人工確認物件數量'));
+          const response = await fetch(gasUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'confirmQuantity', id: booking.id, quantity, items, note }) });
           const result = await response.json();
           if (result.status !== 'success') throw new Error(result.message || '覆核失敗');
           setBookings((current) => current.map((item) => item.id === booking.id ? {
             ...item,
             quantityReviewStatus: result.quantityReviewStatus,
             confirmedQuantity: result.confirmedQuantity,
+            confirmedItems: result.confirmedItems,
+            reviewNote: result.reviewNote,
             annualApprovedApplications: result.annualApprovedApplications,
             chargeableQuantity: result.chargeableQuantity,
             amountDue: result.amountDue
           } : item));
           setQuantityDrafts((current) => ({ ...current, [booking.id]: quantity }));
+          setReviewItemDrafts((current) => ({ ...current, [booking.id]: result.confirmedItems || items }));
+          setReviewNoteDrafts((current) => ({ ...current, [booking.id]: result.reviewNote || note }));
           setQuantityEditing((current) => ({ ...current, [booking.id]: false }));
         } catch (error) { window.alert('數量覆核失敗：' + error.message); }
         finally { setQuantitySaving(''); }
@@ -369,6 +380,7 @@ import { formatMinguoDate, getMinguoCompactStr, getMinguoTime } from './utils/fo
           setBookings((current) => current.map((item) => item.id === booking.id ? {
             ...item,
             aiReview: result.aiReview ?? item.aiReview,
+            aiAnnotatedPhotos: result.aiAnnotatedPhotos ?? item.aiAnnotatedPhotos,
             quantityReviewStatus: result.quantityReviewStatus ?? item.quantityReviewStatus,
             confirmedQuantity: result.confirmedQuantity ?? item.confirmedQuantity,
             annualApprovedApplications: result.annualApprovedApplications ?? item.annualApprovedApplications,
@@ -625,7 +637,7 @@ import { formatMinguoDate, getMinguoCompactStr, getMinguoTime } from './utils/fo
         });
         return totals;
       }, {})).map(([label, value]) => ({ label, value })));
-      const viewProps = { activeTab, setActiveTab, formatMinguoDate, getMinguoTime, vehicleSelections, setVehicleSelections, tripSelections, setTripSelections, appointmentTimeEditor, setAppointmentTimeEditor, vehicles, showVehicleManager, setShowVehicleManager, newVehicle, setNewVehicle, caseListView, setCaseListView, bookings, setPrintableBooking, setCompletionModalBooking, setPhotoPreview, isAdminAuth, setIsAdminAuth, adminPasswordInput, setAdminPasswordInput, isCheckingPassword, loginError, quantityDrafts, setQuantityDrafts, quantitySaving, quantityEditing, setQuantityEditing, aiSaving, getDispatchDate, getDispatchPeriod, getRouteKey, getNextDispatchTrip, getDispatchChoices, getDispatchLabel, getCountyDistrict, getLocalAddress, addVehicle, removeVehicle, getPhotoPreviewUrl, handleAdminLogin, handleAdminUpdateStatus, getRouteCarbon, getCustomRouteCarbon, getSuggestedRouteUrl, openRouteEditor, saveAppointmentTime, handleScheduleBooking, handleConfirmQuantity, handleRetryAi, handleCancelSchedule, handleExportCSV, isPendingStatus, getDisplayStatus, pendingCount, visibleCaseBookings, routeEditor, setRouteEditor, isSyncingGas, dashboardPeriod, setDashboardPeriod, dashboardView, setDashboardView, dashboardDetailType, setDashboardDetailType, dashboardKeyword, setDashboardKeyword, photoPreview, fetchFromGoogleSheets, buildRouteUrl, moveRouteStop, dashboardBookings, dashboardConfirmedItems, dashboardAmountDue, dashboardCollectedAmount, dashboardOutstandingAmount, dashboardCompletionDistanceKm, dashboardCompletionCarbonKg, dashboardCompleted, dashboardCurrentData, dashboardMaxValue, dashboardDetail, dashboardDetailRows, dashboardDetailTotals, dashboardKeywordMatchesItem, dashboardDetailItemTotals, completionModalBooking, completionPhotos, setCompletionPhotos, completionNote, setCompletionNote, isUploadingDrive, completionUploadSecondsLeft, handleCompletionPhotoFileChange, handleSubmitCompletionModal, QRCodeBox, printableBooking };
+      const viewProps = { activeTab, setActiveTab, formatMinguoDate, getMinguoTime, vehicleSelections, setVehicleSelections, tripSelections, setTripSelections, appointmentTimeEditor, setAppointmentTimeEditor, vehicles, showVehicleManager, setShowVehicleManager, newVehicle, setNewVehicle, caseListView, setCaseListView, bookings, setPrintableBooking, setCompletionModalBooking, setPhotoPreview, isAdminAuth, setIsAdminAuth, adminPasswordInput, setAdminPasswordInput, isCheckingPassword, loginError, quantityDrafts, setQuantityDrafts, reviewItemDrafts, setReviewItemDrafts, reviewNoteDrafts, setReviewNoteDrafts, quantitySaving, quantityEditing, setQuantityEditing, aiSaving, getDispatchDate, getDispatchPeriod, getRouteKey, getNextDispatchTrip, getDispatchChoices, getDispatchLabel, getCountyDistrict, getLocalAddress, addVehicle, removeVehicle, getPhotoPreviewUrl, handleAdminLogin, handleAdminUpdateStatus, getRouteCarbon, getCustomRouteCarbon, getSuggestedRouteUrl, openRouteEditor, saveAppointmentTime, handleScheduleBooking, handleConfirmQuantity, handleRetryAi, handleCancelSchedule, handleExportCSV, isPendingStatus, getDisplayStatus, pendingCount, visibleCaseBookings, routeEditor, setRouteEditor, isSyncingGas, dashboardPeriod, setDashboardPeriod, dashboardView, setDashboardView, dashboardDetailType, setDashboardDetailType, dashboardKeyword, setDashboardKeyword, photoPreview, fetchFromGoogleSheets, buildRouteUrl, moveRouteStop, dashboardBookings, dashboardConfirmedItems, dashboardAmountDue, dashboardCollectedAmount, dashboardOutstandingAmount, dashboardCompletionDistanceKm, dashboardCompletionCarbonKg, dashboardCompleted, dashboardCurrentData, dashboardMaxValue, dashboardDetail, dashboardDetailRows, dashboardDetailTotals, dashboardKeywordMatchesItem, dashboardDetailItemTotals, completionModalBooking, completionPhotos, setCompletionPhotos, completionNote, setCompletionNote, isUploadingDrive, completionUploadSecondsLeft, handleCompletionPhotoFileChange, handleSubmitCompletionModal, QRCodeBox, printableBooking };
 
       return (
         <div className="civic-shell min-h-screen flex flex-col">
