@@ -1,7 +1,7 @@
 import { CATEGORIES } from '../../data/appData.js';
 
 export default function CaseManagementView(props) {
-  const { activeTab, formatMinguoDate, getMinguoTime, vehicleSelections, setVehicleSelections, tripSelections, setTripSelections, appointmentTimeEditor, setAppointmentTimeEditor, vehicles, showVehicleManager, setShowVehicleManager, newVehicle, setNewVehicle, caseListView, setCaseListView, bookings, setPrintableBooking, setCompletionModalBooking, setPhotoPreview, isAdminAuth, setIsAdminAuth, adminPasswordInput, setAdminPasswordInput, isCheckingPassword, loginError, quantityDrafts, setQuantityDrafts, reviewItemDrafts, setReviewItemDrafts, reviewNoteDrafts, setReviewNoteDrafts, quantitySaving, quantityEditing, setQuantityEditing, aiSaving, getDispatchDate, getDispatchPeriod, getRouteKey, getNextDispatchTrip, getDispatchChoices, getDispatchLabel, getCountyDistrict, getLocalAddress, addVehicle, removeVehicle, getPhotoPreviewUrl, handleAdminLogin, handleAdminUpdateStatus, getRouteCarbon, getCustomRouteCarbon, getSuggestedRouteUrl, openRouteEditor, saveAppointmentTime, handleScheduleBooking, handleConfirmQuantity, handleRetryAi, handleCancelSchedule, handleExportCSV, isPendingStatus, getDisplayStatus, pendingCount, visibleCaseBookings } = props;
+  const { activeTab, formatMinguoDate, getMinguoTime, vehicleSelections, setVehicleSelections, tripSelections, setTripSelections, appointmentTimeEditor, setAppointmentTimeEditor, vehicles, showVehicleManager, setShowVehicleManager, newVehicle, setNewVehicle, caseListView, setCaseListView, caseKeyword, setCaseKeyword, bookings, setPrintableBooking, setCompletionModalBooking, setPhotoPreview, isAdminAuth, setIsAdminAuth, adminPasswordInput, setAdminPasswordInput, isCheckingPassword, loginError, quantityDrafts, setQuantityDrafts, reviewItemDrafts, setReviewItemDrafts, reviewNoteDrafts, setReviewNoteDrafts, quantitySaving, quantityEditing, setQuantityEditing, aiSaving, getDispatchDate, getDispatchPeriod, getRouteKey, getNextDispatchTrip, getDispatchChoices, getDispatchLabel, getCountyDistrict, getLocalAddress, addVehicle, removeVehicle, getPhotoPreviewUrl, handleAdminLogin, handleAdminUpdateStatus, getRouteCarbon, getCustomRouteCarbon, getSuggestedRouteUrl, openRouteEditor, saveAppointmentTime, handleScheduleBooking, handleConfirmQuantity, handleRetryAi, handleCancelSchedule, handleExportCSV, isPendingStatus, getDisplayStatus, pendingCount, visibleCaseBookings } = props;
   const getCreatedAtSortValue = (value) => {
     const raw = String(value || '').trim();
     const minguo = raw.match(/^(?:民國\s*)?(\d{2,3})[/.\-](\d{1,2})[/.\-](\d{1,2})(?:(上午|下午)?\s*(\d{1,2})[:時](\d{1,2})?)?/);
@@ -125,13 +125,19 @@ export default function CaseManagementView(props) {
 
                     {/* Table */}
                     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-lg shadow-slate-300/20">
-                      <div className="flex flex-col gap-2 border-b border-slate-200 bg-emerald-50/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex flex-col gap-3 border-b border-slate-200 bg-emerald-50/70 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
                         <div>
                           <h3 className="text-sm font-black text-slate-800">清運案件列表</h3>
                           <p className="mt-0.5 text-xs text-slate-500">目前顯示 {visibleCaseBookings.length} 筆／共 {bookings.length} 筆案件，依申請時間由最早至最新排列</p>
                         </div>
-                        <div className="flex flex-wrap items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 text-[11px] font-bold">
-                          {[['active','進行中'],['pending','待處理'],['scheduled','已排班'],['completed','已完成'],['cancelled','已取消'],['all','全部']].map(([view, label]) => <button type="button" key={view} onClick={() => setCaseListView(view)} className={'rounded-lg px-3 py-1.5 transition-colors ' + (caseListView === view ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100')}>{label}</button>)}
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                          <div className="flex min-w-0 gap-2">
+                            <label className="relative min-w-0 flex-1 sm:w-72"><span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400">⌕</span><input type="search" value={caseKeyword} onChange={(event) => setCaseKeyword(event.target.value)} placeholder="搜尋電話、單號、地址、申請人姓名" aria-label="搜尋清運案件" className="w-full rounded-xl border border-slate-300 bg-white py-2 pl-9 pr-3 text-xs font-bold text-slate-800 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" /></label>
+                            {caseKeyword && <button type="button" onClick={() => setCaseKeyword('')} className="shrink-0 rounded-xl border border-slate-300 bg-white px-3 text-xs font-black text-slate-600 hover:bg-slate-100">清除</button>}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 text-[11px] font-bold">
+                            {[['active','進行中'],['pending','待處理'],['scheduled','已排班'],['completed','已完成'],['cancelled','已取消'],['all','全部']].map(([view, label]) => <button type="button" key={view} onClick={() => setCaseListView(view)} className={'rounded-lg px-3 py-1.5 transition-colors ' + (caseListView === view ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100')}>{label}</button>)}
+                          </div>
                         </div>
                       </div>
 
@@ -148,6 +154,7 @@ export default function CaseManagementView(props) {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-200 text-slate-700">
+                            {!visibleCaseBookings.length && <tr><td colSpan="6" className="bg-white px-4 py-12 text-center text-sm font-bold text-slate-400">{caseKeyword ? '找不到符合搜尋條件的案件' : '此分類目前沒有案件'}</td></tr>}
                             {[...visibleCaseBookings].sort((a, b) => getCreatedAtSortValue(a.createdAt) - getCreatedAtSortValue(b.createdAt) || String(a.id || '').localeCompare(String(b.id || ''), 'zh-Hant')).map((b, rowIndex, ordered) => {
                               const routeGroupKey = b.status === '已排班' ? getRouteKey(b) : '';
                               const groupBookings = routeGroupKey ? ordered.filter((item) => item.status === '已排班' && getRouteKey(item) === routeGroupKey) : [b];

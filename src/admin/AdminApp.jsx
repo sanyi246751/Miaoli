@@ -62,6 +62,7 @@ import { formatMinguoDate, getMinguoCompactStr, getMinguoTime } from './utils/fo
       const [isSyncingGas, setIsSyncingGas] = useState(false);
       const [syncMessage, setSyncMessage] = useState('');
       const [caseListView, setCaseListView] = useState('active');
+      const [caseKeyword, setCaseKeyword] = useState('');
       const [dashboardPeriod, setDashboardPeriod] = useState('all');
       const [dashboardView, setDashboardView] = useState('status');
       const [dashboardDetailType, setDashboardDetailType] = useState('collected');
@@ -632,6 +633,8 @@ import { formatMinguoDate, getMinguoCompactStr, getMinguoTime } from './utils/fo
       const isPendingStatus = (status) => ['已收件', '待審核', '待處理', '審核中'].includes(String(status || '').trim());
       const getDisplayStatus = (status) => isPendingStatus(status) ? '待處理' : status;
       const pendingCount = bookings.filter((b) => isPendingStatus(b.status)).length;
+      const normalizedCaseKeyword = caseKeyword.trim().toLowerCase();
+      const normalizedCasePhoneKeyword = normalizedCaseKeyword.replace(/\D/g, '');
       const visibleCaseBookings = bookings.filter((booking) => {
         if (caseListView === 'pending') return isPendingStatus(booking.status);
         if (caseListView === 'scheduled') return booking.status === '已排班';
@@ -639,6 +642,11 @@ import { formatMinguoDate, getMinguoCompactStr, getMinguoTime } from './utils/fo
         if (caseListView === 'cancelled') return booking.status === '已取消';
         if (caseListView === 'all') return true;
         return booking.status !== '清運完成' && booking.status !== '已取消';
+      }).filter((booking) => {
+        if (!normalizedCaseKeyword) return true;
+        const searchableText = [booking.id, booking.applicantName, booking.phone, booking.county, booking.district, booking.address].join(' ').toLowerCase();
+        const phoneDigits = String(booking.phone || '').replace(/\D/g, '');
+        return searchableText.includes(normalizedCaseKeyword) || Boolean(normalizedCasePhoneKeyword && phoneDigits.includes(normalizedCasePhoneKeyword));
       });
       const dashboardNow = new Date();
       const parseDashboardDate = (value) => {
@@ -722,7 +730,7 @@ import { formatMinguoDate, getMinguoCompactStr, getMinguoTime } from './utils/fo
         });
         return totals;
       }, {})).map(([label, value]) => ({ label, value })));
-      const viewProps = { activeTab, setActiveTab, formatMinguoDate, getMinguoTime, vehicleSelections, setVehicleSelections, tripSelections, setTripSelections, appointmentTimeEditor, setAppointmentTimeEditor, vehicles, showVehicleManager, setShowVehicleManager, newVehicle, setNewVehicle, caseListView, setCaseListView, bookings, setPrintableBooking, setCompletionModalBooking, setPhotoPreview, isAdminAuth, setIsAdminAuth, adminPasswordInput, setAdminPasswordInput, isCheckingPassword, loginError, quantityDrafts, setQuantityDrafts, reviewItemDrafts, setReviewItemDrafts, reviewNoteDrafts, setReviewNoteDrafts, quantitySaving, quantityEditing, setQuantityEditing, aiSaving, getDispatchDate, getDispatchPeriod, getRouteKey, getNextDispatchTrip, getDispatchChoices, getDispatchLabel, getCountyDistrict, getLocalAddress, addVehicle, removeVehicle, getPhotoPreviewUrl, handleAdminLogin, handleAdminUpdateStatus, getRouteCarbon, getCustomRouteCarbon, getSuggestedRouteUrl, openRouteEditor, saveAppointmentTime, handleScheduleBooking, handleConfirmQuantity, handleRetryAi, handleCancelSchedule, handleExportCSV, isPendingStatus, getDisplayStatus, pendingCount, visibleCaseBookings, routeEditor, setRouteEditor, isSyncingGas, dashboardPeriod, setDashboardPeriod, dashboardView, setDashboardView, dashboardDetailType, setDashboardDetailType, dashboardKeyword, setDashboardKeyword, photoPreview, fetchFromGoogleSheets, buildRouteUrl, moveRouteStop, dashboardBookings, dashboardConfirmedItems, dashboardAmountDue, dashboardCollectedAmount, dashboardOutstandingAmount, dashboardCompletionDistanceKm, dashboardCompletionCarbonKg, dashboardCompleted, dashboardCurrentData, dashboardMaxValue, dashboardDetail, dashboardDetailRows, dashboardDetailTotals, dashboardKeywordMatchesItem, dashboardDetailItemTotals, completionModalBooking, completionPhotos, setCompletionPhotos, completionNote, setCompletionNote, isUploadingDrive, completionUploadSecondsLeft, handleCompletionPhotoFileChange, handleSubmitCompletionModal, QRCodeBox, printableBooking };
+      const viewProps = { activeTab, setActiveTab, formatMinguoDate, getMinguoTime, vehicleSelections, setVehicleSelections, tripSelections, setTripSelections, appointmentTimeEditor, setAppointmentTimeEditor, vehicles, showVehicleManager, setShowVehicleManager, newVehicle, setNewVehicle, caseListView, setCaseListView, caseKeyword, setCaseKeyword, bookings, setPrintableBooking, setCompletionModalBooking, setPhotoPreview, isAdminAuth, setIsAdminAuth, adminPasswordInput, setAdminPasswordInput, isCheckingPassword, loginError, quantityDrafts, setQuantityDrafts, reviewItemDrafts, setReviewItemDrafts, reviewNoteDrafts, setReviewNoteDrafts, quantitySaving, quantityEditing, setQuantityEditing, aiSaving, getDispatchDate, getDispatchPeriod, getRouteKey, getNextDispatchTrip, getDispatchChoices, getDispatchLabel, getCountyDistrict, getLocalAddress, addVehicle, removeVehicle, getPhotoPreviewUrl, handleAdminLogin, handleAdminUpdateStatus, getRouteCarbon, getCustomRouteCarbon, getSuggestedRouteUrl, openRouteEditor, saveAppointmentTime, handleScheduleBooking, handleConfirmQuantity, handleRetryAi, handleCancelSchedule, handleExportCSV, isPendingStatus, getDisplayStatus, pendingCount, visibleCaseBookings, routeEditor, setRouteEditor, isSyncingGas, dashboardPeriod, setDashboardPeriod, dashboardView, setDashboardView, dashboardDetailType, setDashboardDetailType, dashboardKeyword, setDashboardKeyword, photoPreview, fetchFromGoogleSheets, buildRouteUrl, moveRouteStop, dashboardBookings, dashboardConfirmedItems, dashboardAmountDue, dashboardCollectedAmount, dashboardOutstandingAmount, dashboardCompletionDistanceKm, dashboardCompletionCarbonKg, dashboardCompleted, dashboardCurrentData, dashboardMaxValue, dashboardDetail, dashboardDetailRows, dashboardDetailTotals, dashboardKeywordMatchesItem, dashboardDetailItemTotals, completionModalBooking, completionPhotos, setCompletionPhotos, completionNote, setCompletionNote, isUploadingDrive, completionUploadSecondsLeft, handleCompletionPhotoFileChange, handleSubmitCompletionModal, QRCodeBox, printableBooking };
 
       return (
         <div className="civic-shell min-h-screen flex flex-col">
