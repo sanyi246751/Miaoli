@@ -445,6 +445,11 @@ import { formatMinguoDate, getMinguoCompactStr, getMinguoTime } from './utils/fo
       };
 
       const handleRetryAi = async (booking) => {
+        const declaredItems = (booking.items || []).map((item) => ({ name: String(item.name || '其他'), quantity: Number(item.quantity || 0) }));
+        const declaredTotal = declaredItems.reduce((sum, item) => sum + item.quantity, 0);
+        setReviewItemDrafts((current) => ({ ...current, [booking.id]: declaredItems }));
+        setQuantityDrafts((current) => ({ ...current, [booking.id]: declaredTotal }));
+        setQuantityEditing((current) => ({ ...current, [booking.id]: true }));
         setAiSaving(booking.id);
         try {
           const response = await fetch(gasUrl + '?action=analyzeBookingPhotos&id=' + encodeURIComponent(booking.id));
